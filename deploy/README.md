@@ -1,4 +1,16 @@
-# VPS staging plan (not yet deployed)
+# VPS deployment and recovery
+
+## Deployment status — 2026-09-25
+
+Live review URL: https://cstack.space/sci-chatbot/
+
+Deployed application revision: `0150250ea988deb7473fad4d2f6eb7f60ec317b7` on `deploy/vps-setup`. A later documentation commit does not imply the live application has changed. Services `sci-chatbot-api` and `sci-chatbot-web` are enabled; PostgreSQL and both application ports listen on loopback only. Nginx was gracefully reloaded after syntax validation, with the prior config retained privately.
+
+Restore verification: 50 document records, 798 chunks (768-dimensional embeddings), 29 uploaded files with matching checksums; counts of managed tables/relationships match the transfer manifest. Auth sessions, chat messages and conversations were excluded. This is a point-in-time migration, not ongoing synchronization with the development machine.
+
+Checks passed: Linux production build and dependency consistency; three private live Gemini questions (major overview, semester credits, follow-up total); public browser health, logo, login page navigation, source PDF/image and 390px layout without overflow or page JavaScript errors. All three pre-existing sites returned 200 and their aggregate file hash stayed unchanged. Authenticated public CRUD/upload and a complete public chat journey still require a separate acceptance check; do not interpret these limited checks as full system certification.
+
+First-launch requests briefly returned 404 immediately after the asynchronous Nginx reload. Subsequent direct-origin and public checks returned 200 without additional config changes. Keep readiness polling separate from the reload command's exit status.
 
 Provisioning approval received 2026-09-25 for this host/application, including the PostgreSQL service account and the dedicated sci_chatbot database role. This is not standing permission for other accounts or later deployments.
 
