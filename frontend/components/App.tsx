@@ -3,6 +3,8 @@ import { useEffect, useState, useRef, FormEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   FiMenu,
+  FiMoreHorizontal,
+  FiEdit,
   FiPlus,
   FiArrowUp,
   FiMessageSquare,
@@ -312,6 +314,57 @@ function Login({ onLogin }: { onLogin: (u: Row) => void }) {
     </main>
   );
 }
+
+function sourceHref(url: string) {
+  if (/^https?:\/\//i.test(url) || /^\/(?!\/)/.test(url)) return publicUrl(url);
+  return undefined;
+}
+function AnswerText({ text, sources }: { text: string; sources: Row[] }) {
+  const render = (value: string) => value.split(/(\[\d+\])/g).map((part, index) => {
+    const match = /^\[(\d+)\]$/.exec(part);
+    const source = match && sources[Number(match[1]) - 1];
+    const href = source && sourceHref(source.url || "");
+    if (!href) return part;
+    const label = source.title || "แหล่งข้อมูล";
+    return <a key={index} className="citation-chip" href={href} target="_blank" rel="noopener noreferrer" title={label} aria-label={"เปิดแหล่งข้อมูล: " + label}><FiFileText /><span>{label}</span><FiExternalLink /></a>;
+  });
+  return <div className="bot-message">{text.split(/\n\s*\n/).map((paragraph, i) => {
+    const lines = paragraph.split("\n");
+    return <div className="answer-paragraph" key={i}>{lines.map((line, j) => {
+      const bullet = /^\s*[•*]\s+/.test(line);
+      return <div key={j} className={bullet ? "answer-bullet" : "answer-line"}>{render(bullet ? line.replace(/^\s*[•*]\s+/, "") : line)}</div>;
+    })}</div>;
+  })}</div>;
+}
+function ConversationActions({busy, onAction}: {busy: boolean; onAction: (action: "rename" | "rate" | "delete") => void}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    ref.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    const outside = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [open]);
+  return <div className="conversation-actions" ref={ref} onKeyDown={e => {
+    if (e.key === "Escape") { setOpen(false); trigger.current?.focus(); }
+    if (e.key === "Tab") setOpen(false);
+    if (open && ["ArrowDown","ArrowUp","Home","End"].includes(e.key)) {
+      e.preventDefault();
+      const items = Array.from(ref.current!.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+      const index = items.indexOf(document.activeElement as HTMLElement);
+      items[e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : (index + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
+    }
+  }}>
+    <button ref={trigger} className="icon" aria-label="ตัวเลือกบทสนทนา" aria-haspopup="menu" aria-expanded={open} disabled={busy} onClick={() => setOpen(!open)}><FiMoreHorizontal /></button>
+    {open && <div className="conversation-menu" role="menu" aria-label="จัดการบทสนทนา">
+      {([["rename","เปลี่ยนชื่อ",FiEdit2],["rate","ประเมินบทสนทนา",FiStar],["delete","ลบบทสนทนา",FiTrash2]] as const).map(([action,label,Icon]) =>
+        <button key={action} role="menuitem" className={action === "delete" ? "delete-action" : ""} onClick={() => { setOpen(false); trigger.current?.focus(); onAction(action); }}><Icon />{label}</button>)}
+    </div>}
+  </div>;
+}
+
 function ChatApp() {
   const [sessions, setSessions] = useState<Row[]>([]);
   const [active, setActive] = useState<string | null>(null);
@@ -320,6 +373,24 @@ function ChatApp() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [menu, setMenu] = useState(false);
+  const [staff, setStaff] = useState<Row | null>(null);
+  const sideRef = useRef<HTMLElement>(null);
+  const sideToggle = useRef<HTMLButtonElement>(null);
+  useEffect(() => { api("/auth/me").then(setStaff).catch(() => {}); }, []);
+  useEffect(() => {
+    if (!menu) return;
+    sideRef.current?.querySelector<HTMLElement>("a,button")?.focus();
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setMenu(false); sideToggle.current?.focus(); }
+      if (event.key === "Tab") {
+        const els = Array.from(sideRef.current?.querySelectorAll<HTMLElement>("a[href],button:not([disabled])") || []).filter(el => el.getClientRects().length);
+        if (event.shiftKey && document.activeElement === els[0]) { event.preventDefault(); els.at(-1)?.focus(); }
+        else if (!event.shiftKey && document.activeElement === els.at(-1)) { event.preventDefault(); els[0]?.focus(); }
+      }
+    };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [menu]);
   const [modal, setModal] = useState<"rename" | "delete" | "rate" | null>(null);
   const [dismissed, setDismissed] = useState<string[]>([]);
   const end = useRef<HTMLDivElement>(null);
@@ -414,23 +485,6 @@ function ChatApp() {
   ] as const;
   return (
     <div className="chat-shell">
-      <header className="chat-top">
-        <button
-          className="icon mobile-toggle"
-          aria-label="เปิดประวัติการสนทนา"
-          aria-expanded={menu}
-          onClick={() => setMenu(!menu)}
-        >
-          <FiMenu />
-        </button>
-        <a className="brand" href={publicUrl("/")}>
-          <Mark />
-          <strong>ไซน์แชทบอท</strong>
-        </a>
-        <a className="login-link" href={publicUrl("/login")}>
-          <FiUser /> เข้าสู่ระบบ
-        </a>
-      </header>
       {menu && (
         <button
           className="scrim"
@@ -438,9 +492,13 @@ function ChatApp() {
           onClick={() => setMenu(false)}
         />
       )}
-      <aside className={"chat-side " + (menu ? "open" : "")}>
+      <aside ref={sideRef} id="chat-sidebar" aria-label="เมนูสนทนา" className={"chat-side " + (menu ? "open" : "")}>
+        <div className="chat-side-head">
+          <a className="brand" href={publicUrl("/")}><Mark /><strong>ไซน์แชทบอท</strong></a>
+          <button className="icon mobile-toggle" aria-label="ปิดเมนู" onClick={() => { setMenu(false); sideToggle.current?.focus(); }}><FiX /></button>
+        </div>
         <button
-          className="primary wide"
+          className="new-conversation"
           disabled={busy}
           onClick={() => {
             if (
@@ -453,7 +511,7 @@ function ChatApp() {
             else reset();
           }}
         >
-          <FiPlus /> เริ่มสนทนาใหม่
+          <FiEdit /> เริ่มสนทนาใหม่
         </button>
         <p className="side-label">ประวัติการสนทนา</p>
         <nav aria-label="ประวัติการสนทนา">
@@ -465,46 +523,29 @@ function ChatApp() {
                 key={s.id}
                 onClick={() => select(s)}
                 disabled={busy}
+                aria-current={s.id === active ? "page" : undefined}
                 className={"history " + (s.id === active ? "selected" : "")}
               >
                 <FiMessageSquare />
-                <span>{s.title}</span>
+                <span title={s.title}>{s.title}</span>
               </button>
             ))
           )}
         </nav>
-        <div className="side-bottom muted">SCI Chatbot v1.0</div>
+        <div className="chat-side-footer">
+          <a className="staff-entry" href={publicUrl(staff ? (staff.role === "admin" ? "/admin/dashboard" : "/admin/curricula") : "/login")}>
+            <span className="staff-icon"><FiUser /></span>
+            <span><strong>{staff ? staff.fullname : "เข้าสู่ระบบ"}</strong><small>{staff ? "จัดการระบบ" : "(สำหรับเจ้าหน้าที่)"}</small></span>
+          </a>
+          <small className="version">SCI Chatbot v1.0</small>
+        </div>
       </aside>
       <main id="main" className="chat-main">
-        {active && (
-          <div className="conversation-bar">
-            <span>{current?.title || "บทสนทนาใหม่"}</span>
-            <button
-              className="icon"
-              aria-label="แก้ไขชื่อการสนทนา"
-              onClick={() => setModal("rename")}
-              disabled={busy}
-            >
-              <FiEdit2 />
-            </button>
-            <button
-              className="icon"
-              aria-label="ลบบทสนทนา"
-              onClick={() => setModal("delete")}
-              disabled={busy}
-            >
-              <FiTrash2 />
-            </button>
-            <button
-              className="icon"
-              aria-label="ประเมินบทสนทนา"
-              onClick={() => setModal("rate")}
-              disabled={busy}
-            >
-              <FiStar />
-            </button>
-          </div>
-        )}
+        <div className="conversation-bar">
+          <button ref={sideToggle} className="icon mobile-toggle" aria-label="เปิดประวัติการสนทนา" aria-controls="chat-sidebar" aria-expanded={menu} onClick={() => setMenu(true)}><FiMenu /></button>
+          <span className="conversation-title">{active ? current?.title || "บทสนทนาใหม่" : ""}</span>
+          {active && <ConversationActions busy={busy} onAction={setModal} />}
+        </div>
         <div className="chat-scroll">
           {messages.length === 0 ? (
             <section className="welcome">
@@ -541,7 +582,7 @@ function ChatApp() {
                     <div className="bot-row">
                       <Mark />
                       <div className="bot-content">
-                        <div className="bot-message">{m.bot_response}</div>
+                        <AnswerText text={m.bot_response} sources={m.sources || []} />
                         {m.sources?.filter((s: Row) => s.image_url).map((s: Row) => (
                           <a className="answer-image" key={s.url} href={publicUrl(s.url)} target="_blank" rel="noopener noreferrer">
                             {/* Existing source image, never a model-generated URL. */}
@@ -552,7 +593,7 @@ function ChatApp() {
                         ))}
                         {m.sources?.length > 0 && (
                           <details className="sources">
-                            <summary>แหล่งข้อมูล ({m.sources.length})</summary>
+                            <summary><FiBookOpen /> แหล่งข้อมูล · {m.sources.length}</summary>
                             {m.sources.map((s: Row, i: number) => (
                               <a
                                 href={publicUrl(s.url)}
