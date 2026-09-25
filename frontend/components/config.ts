@@ -1,3 +1,4 @@
+import { publicUrl } from "./paths";
 export type Field = {
   key: string;
   label: string;
@@ -128,7 +129,7 @@ export const configs: Record<string, Config> = {
   },
 };
 export async function api(path: string, method = "GET", body?: unknown) {
-  const r = await fetch("/api" + path, {
+  const r = await fetch(publicUrl("/api" + path), {
     method,
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,

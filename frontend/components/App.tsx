@@ -30,6 +30,7 @@ import {
   FiCheck,
 } from "react-icons/fi";
 import { api, configs, Field } from "./config";
+import { publicUrl, appPath } from "./paths";
 type Row = Record<string, any>;
 const titles: Record<string, string> = {
   dashboard: "ภาพรวมระบบ",
@@ -55,7 +56,7 @@ const icons: Record<string, any> = {
 function Mark({ large = false }: { large?: boolean }) {
   return (
     <span className={"mark logo-mark " + (large ? "large" : "")}>
-      <img src="/brand/sci-chatbot.png" alt={large ? "SCI Chatbot" : ""} width={1254} height={1254} />
+      <img src={publicUrl("/brand/sci-chatbot.png")} alt={large ? "SCI Chatbot" : ""} width={1254} height={1254} />
     </span>
   );
 }
@@ -99,7 +100,7 @@ function Modal({
   );
 }
 export default function App() {
-  const path = usePathname();
+  const path = appPath(usePathname());
   const router = useRouter();
   const [user, setUser] = useState<Row | null>(null);
   const [checked, setChecked] = useState(false);
@@ -166,7 +167,7 @@ export default function App() {
     return (
       <main id="main" className="loading">
         <h1>ไม่มีสิทธิ์เข้าถึงหน้านี้</h1>
-        <a href={user.role === "admin" ? "/admin/dashboard" : "/admin/profile"}>
+        <a href={publicUrl(user.role === "admin" ? "/admin/dashboard" : "/admin/profile")}>
           กลับหน้าหลัก
         </a>
       </main>
@@ -203,7 +204,7 @@ export default function App() {
         />
       )}
       <aside className={"admin-side " + (menu ? "open" : "")}>
-        <a className="brand" href="/">
+        <a className="brand" href={publicUrl("/")}>
           <Mark />
           <strong>ไซน์แชทบอท</strong>
         </a>
@@ -215,7 +216,7 @@ export default function App() {
               <a
                 key={k}
                 className={page === k ? "active" : ""}
-                href={"/admin/" + k}
+                href={publicUrl("/admin/" + k)}
                 aria-current={page === k ? "page" : undefined}
               >
                 <Icon />
@@ -229,7 +230,7 @@ export default function App() {
           })}
         </nav>
         <div className="side-bottom">
-          <a href="/">
+          <a href={publicUrl("/")}>
             <FiMessageSquare /> หน้าสนทนา
           </a>
           <button onClick={logout}>
@@ -272,7 +273,7 @@ function Login({ onLogin }: { onLogin: (u: Row) => void }) {
   }
   return (
     <main id="main" className="login-page">
-      <a className="back" href="/">
+      <a className="back" href={publicUrl("/")}>
         <FiArrowLeft /> กลับหน้าสนทนา
       </a>
       <div className="login-card">
@@ -422,11 +423,11 @@ function ChatApp() {
         >
           <FiMenu />
         </button>
-        <a className="brand" href="/">
+        <a className="brand" href={publicUrl("/")}>
           <Mark />
           <strong>ไซน์แชทบอท</strong>
         </a>
-        <a className="login-link" href="/login">
+        <a className="login-link" href={publicUrl("/login")}>
           <FiUser /> เข้าสู่ระบบ
         </a>
       </header>
@@ -542,10 +543,10 @@ function ChatApp() {
                       <div className="bot-content">
                         <div className="bot-message">{m.bot_response}</div>
                         {m.sources?.filter((s: Row) => s.image_url).map((s: Row) => (
-                          <a className="answer-image" key={s.url} href={s.url} target="_blank" rel="noopener noreferrer">
+                          <a className="answer-image" key={s.url} href={publicUrl(s.url)} target="_blank" rel="noopener noreferrer">
                             {/* Existing source image, never a model-generated URL. */}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={s.image_url} alt={s.title} loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                            <img src={publicUrl(s.image_url)} alt={s.title} loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                             <span>{s.title}</span>
                           </a>
                         ))}
@@ -554,7 +555,7 @@ function ChatApp() {
                             <summary>แหล่งข้อมูล ({m.sources.length})</summary>
                             {m.sources.map((s: Row, i: number) => (
                               <a
-                                href={s.url}
+                                href={publicUrl(s.url)}
                                 key={s.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -1100,7 +1101,7 @@ function FieldInput({
             const body = new FormData();
             body.append("file", file);
             try {
-              const r = await fetch("/api/uploads", { method: "POST", body });
+              const r = await fetch(publicUrl("/api/uploads"), { method: "POST", body });
               const data = await r.json();
               if (!r.ok) throw new Error(data.detail);
               setUpload(data.url);
@@ -1492,7 +1493,7 @@ function Reports({ kind }: { kind: string }) {
                         configs[k] && !["curricula", "careers"].includes(k),
                     )
                     .map(([k, v]) => (
-                      <a className="summary-row" href={"/admin/" + k} key={k}>
+                      <a className="summary-row" href={publicUrl("/admin/" + k)} key={k}>
                         <span>{configs[k].single}</span>
                         <strong>{String(v)}</strong>
                       </a>
@@ -1607,7 +1608,7 @@ function RecordView({ path }: { path: string }) {
   }, [path]);
   return (
     <main id="main" className="record-page">
-      <a href="/">← กลับหน้าสนทนา</a>
+      <a href={publicUrl("/")}>← กลับหน้าสนทนา</a>
       {error && <p role="alert">{error}</p>}
       {row && (
         <>
@@ -1622,7 +1623,7 @@ function RecordView({ path }: { path: string }) {
             {row.description || row.content || row.job_description}
           </p>
           {(row.image_url || row.cover_image) && (
-            <img src={row.image_url || row.cover_image} alt={row.topic || row.title || ""} style={{maxWidth:"100%",maxHeight:400,objectFit:"contain"}} />
+            <img src={publicUrl(row.image_url || row.cover_image)} alt={row.topic || row.title || ""} style={{maxWidth:"100%",maxHeight:400,objectFit:"contain"}} />
           )}
           <dl>
             {recordConfig?.fields.filter(f => !["description","content","job_description","topic","title","degree_name","major_name_th","job_title","file_url","image_url","cover_image","major_id","career_ids"].includes(f.key) && row[f.key] !== null && row[f.key] !== undefined && row[f.key] !== "").map(f => (
@@ -1632,9 +1633,9 @@ function RecordView({ path }: { path: string }) {
               </div>
             ))}
           </dl>
-          {row.file_url && <p><a href={row.file_url} target="_blank" rel="noopener noreferrer">ไฟล์หลักสูตร (PDF)</a></p>}
+          {row.file_url && <p><a href={publicUrl(row.file_url)} target="_blank" rel="noopener noreferrer">ไฟล์หลักสูตร (PDF)</a></p>}
           {row.source_url && (
-            <a href={row.source_url} target="_blank" rel="noopener noreferrer">
+            <a href={publicUrl(row.source_url)} target="_blank" rel="noopener noreferrer">
               ดูแหล่งข้อมูลทางการ
             </a>
           )}
