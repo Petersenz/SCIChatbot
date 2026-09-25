@@ -1,0 +1,28 @@
+[Unit]
+Description=SCI Chatbot Web
+After=network-online.target sci-chatbot-api.service
+Wants=network-online.target
+StartLimitIntervalSec=180
+StartLimitBurst=3
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/apps/sci-chatbot/current/frontend
+Environment=NODE_ENV=production
+Environment=NEXT_PUBLIC_BASE_PATH=/sci-chatbot
+Environment=NEXT_TELEMETRY_DISABLED=1
+ExecStart=/home/ubuntu/apps/sci-chatbot/runtime/node-v22.23.3-linux-x64/bin/node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3110
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/apps/sci-chatbot
+MemoryMax=1G
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

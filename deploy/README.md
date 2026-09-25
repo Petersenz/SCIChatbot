@@ -1,5 +1,9 @@
 # VPS staging plan (not yet deployed)
 
+Provisioning approval received 2026-09-25 for this host/application, including the PostgreSQL service account and the dedicated sci_chatbot database role. This is not standing permission for other accounts or later deployments.
+
+Use `constraints.txt` with `backend/requirements.txt`; install `torch==2.9.1` from the official CPU wheel index first. Node runtime used for this deployment is 22.23.3. Embedding cache is pinned to revision `4328cf26390c98c5e3c738b4460a05b95f4911f5`, matching the local model. The private env sets EMBEDDING_MODEL to that snapshot directory. Service unit examples are specific to the inspected Ubuntu host, existing ubuntu account and runtime paths; review before reuse.
+
 Target: Ubuntu 24.04, existing Nginx, public URL `/sci-chatbot/` on the existing HTTPS host.
 
 ## Required setup before activation
