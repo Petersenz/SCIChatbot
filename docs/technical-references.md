@@ -11,3 +11,6 @@
 | Lewis, P., et al. (2020). Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. https://arxiv.org/abs/2005.11401 | ค้นหลักฐานจากคลังเอกสารก่อนให้โมเดลสร้างคำตอบ | rag.retrieve/answer, documents/document_chunks, embeddings | ใช้อธิบายหลักการ RAG; การกรองสาขา ปี เทอม และหมายเลขอ้างอิงเป็นรายละเอียดการพัฒนาของโครงการ ไม่อ้างว่างานนี้พิสูจน์วิธีเฉพาะทั้งหมด |
 
 ในการเขียนเล่ม ให้จัดรูปแบบผู้แต่ง/วันที่เข้าถึงให้ตรงคู่มือมหาวิทยาลัย และตรวจรายการเดิมไม่ให้ซ้ำ ผลทดสอบเชิงวิศวกรรมใน fullflow-audit-20260924.md ต้องแยกจากผลประเมินระบบและความพึงพอใจที่ยังไม่ได้เก็บจริง
+
+
+25 กันยายน 2569: Google. Text generation — System instructions. https://ai.google.dev/gemini-api/docs/text-generation#system-instructions (เข้าถึง25กันยายน2569). ใช้กำหนดรูปแบบการเรียบเรียงใน Gemini call เดิม ไม่ได้เพิ่มการค้นข้อมูลภายนอกหรือเปลี่ยนขอบเขตงานวิจัย; หลักฐาน docs/readable-answers-20260925.md.
