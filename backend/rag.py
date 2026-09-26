@@ -2,6 +2,8 @@ import os, re, threading, time, logging, hashlib
 import random
 import httpx
 from . import generation_cache
+from .grounded_evidence import prepare_sources, exact_answer, VERSION
+from .llm_provider import identity, GroqClient
 from .response_style import RESPONSE_STYLE, format_answer, overview_style
 from .text_processing import normalize_text, split_evidence
 from .query_understanding import resolve, canonical, ambiguity, topic, TERM, STUDY
@@ -438,6 +440,13 @@ def answer(db, q, history):
             intent.id if intent else None,
             "no_evidence",
         )
+    fixed = exact_answer(query, sources)
+    if fixed:
+        body, supported = fixed
+        logger.info('rag_grounded_answer supported=%s', supported)
+        return body, with_images(db, sources), supported, intent.id if intent else None, 'grounded'
+    sources = prepare_sources(sources)
+    provider, model = identity()
     context = "\n\n".join(
         f'[{i+1}] {s["title"]}\n{compact_evidence(s["text"]) if s.get("url", "").startswith("/records/news/") else s["text"]}' for i, s in enumerate(sources)
     )
@@ -455,24 +464,24 @@ def answer(db, q, history):
         + query
         + "\n" + overview_style(query)
     )
-    cache_key = generation_cache.key_for(prompt, sources, os.environ.get('GEMINI_MODEL', ''))
+    cache_key = generation_cache.key_for(prompt, sources, VERSION + ':' + provider + ':' + model)
     cached = generation_cache.get(cache_key)
     if cached:
         body, selected = cached
         logger.info('rag_generation_cache_hit prompt_chars=%s sources=%s', len(prompt), len(selected))
-        return body, with_images(db, selected), True, intent.id if intent else None, 'gemini_cached'
-    logger.info('rag_generation_start prompt_chars=%s sources=%s cache=miss', len(prompt), len(sources))
+        return body, with_images(db, selected), True, intent.id if intent else None, provider + '_cached'
+    logger.info('rag_generation_start provider=%s model=%s prompt_chars=%s sources=%s cache=miss', provider, model, len(prompt), len(sources))
     client = None
     try:
         from google import genai
         from google.genai import types
 
-        client = genai.Client(
+        client = GroqClient() if provider == 'groq' else genai.Client(
             api_key=os.environ["GEMINI_API_KEY"],
             http_options=types.HttpOptions(timeout=15000, retry_options=types.HttpRetryOptions(attempts=1)),
         )
         result = generate_with_retry(lambda: client.models.generate_content(
-            model=os.environ["GEMINI_MODEL"],
+            model=model,
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=RESPONSE_STYLE + "\n" + overview_style(query),
@@ -496,7 +505,7 @@ def answer(db, q, history):
             if any(s['text'].startswith('ข่าวที่มีวันที่เผยแพร่ล่าสุดในข้อมูล') for s in sources):
                 body += '\n\nอ้างอิงเฉพาะข่าวในระบบที่ระบุวันที่เผยแพร่ ยังไม่ยืนยันว่าเป็นข่าวล่าสุดบนเว็บไซต์คณะ'
             generation_cache.put(cache_key, (body, sources))
-        return body, with_images(db, sources), not unknown, intent.id if intent else None, "gemini"
+        return body, with_images(db, sources), not unknown, intent.id if intent else None, provider
     except Exception as exc:
         logger.warning("rag_generation_failed type=%s", type(exc).__name__)
         return (
