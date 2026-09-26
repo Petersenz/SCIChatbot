@@ -1,6 +1,7 @@
 """Conservative question normalization within the faculty-advising scope."""
 import re
 from .text_processing import normalize_text
+from .career_scope import career_names
 
 YEAR = r'(?<!\d)(25\d{2})(?!\d)'
 STUDY = r'ปี\s*(?:ที่\s*)?([1-6])(?!\d)'
@@ -30,7 +31,7 @@ def topic(q):
         return 'tuition'
     if any(t in q for t in ['ข่าว', 'ประกาศ', 'รับสมัคร', 'สมัครเรียน', 'open house']):
         return 'news'
-    if any(t in q for t in ['อาชีพ', 'ทำงาน', 'จบไป', 'เงินเดือน', 'ทักษะ']):
+    if any(t in q for t in ['อาชีพ', 'ทำงาน', 'จบไป', 'เงินเดือน', 'รายได้', 'ค่าตอบแทน', 'ทักษะ', 'ทำเว็บ']):
         return 'career'
     if any(t in q for t in ['ติดต่อ', 'ที่อยู่', 'ตั้งอยู่', 'เบอร์โทร', 'โทรศัพท์', 'อีเมล']):
         return 'contact'
@@ -62,23 +63,37 @@ def general_topic(q):
     return None
 
 
-def resolve(q, history, majors):
+def resolve(q, history, majors, career_titles=()):
     state = ''
+    focus = []
     for raw in [t.user_query for t in history] + [q]:
         current = canonical(raw)
+        # Acknowledgements do not erase the active subject. Return the actual
+        # acknowledgement itself if it is the final input.
+        if re.fullmatch(r'(?:ขอบคุณ|โอเค|เข้าใจแล้ว|ครับ|ค่ะ|คะ)[ !?.]*(?:ครับ|ค่ะ|คะ)?[ !?.]*', current):
+            continue
+        explicit_focus = career_names(current, career_titles)
+        if explicit_focus and topic(current) == 'curriculum':
+            current += ' อาชีพ'
         named = mentioned_majors(current, majors)
         old_named = mentioned_majors(state, majors)
         general = general_topic(current)
+        broad = any(x in current for x in ['ทั้งคณะ', 'ของคณะ', 'มหาวิทยาลัย', 'ทุกสาขา'])
+        switched = bool(named and {m.id for m in named} != {m.id for m in old_named})
+        if switched or broad or topic(current) != 'career' or any(x in current for x in ['อาชีพทั้งหมด', 'อาชีพอะไรบ้าง', 'งานอะไรบ้าง', 'อาชีพอื่น', 'ทุกอาชีพ', 'ทุกงาน']):
+            focus = []
+        if explicit_focus:
+            focus = explicit_focus
         # Carry the major, not the old semester/year, into a new general topic.
         if general and not named and old_named and not any(x in current for x in ['ทั้งคณะ', 'ของคณะ', 'มหาวิทยาลัย', 'ทุกสาขา']):
-            current = old_named[0].major_name_th + ' ' + current
+            current = ' / '.join(m.major_name_th for m in old_named) + ' ' + current
             named = mentioned_majors(current, majors)
-        followup = any(t in current for t in ['แล้ว', 'เทอม', 'ภาคเรียน', 'ภาคการศึกษา', 'สาขานี้', 'หลักสูตรนี้', 'หน่วยกิต', 'ทั้งหลักสูตร', 'ตลอดหลักสูตร', 'ค่าเทอม', 'จบไป'])
+        followup = any(t in current for t in ['แล้ว', 'เทอม', 'ภาคเรียน', 'ภาคการศึกษา', 'สาขานี้', 'หลักสูตรนี้', 'หน่วยกิต', 'ทั้งหลักสูตร', 'ตลอดหลักสูตร', 'ค่าเทอม', 'จบไป', 'เงินเดือน', 'รายได้', 'ค่าตอบแทน', 'ทักษะ', 'อาชีพ', 'ทำงาน', 'เรียนอะไร', 'เรียนกี่ปี'])
         same = not named or {m.id for m in named} == {m.id for m in old_named}
-        if followup and same and old_named and not general and topic(current) not in ['news', 'contact', 'history', 'mission']:
+        if followup and same and old_named and not broad and not general and topic(current) not in ['news', 'contact', 'history', 'mission']:
             if not named:
-                current = old_named[0].major_name_th + ' ' + current
-            patterns = [YEAR]
+                current = ' / '.join(m.major_name_th for m in old_named) + ' ' + current
+            patterns = [YEAR] if topic(current) in ['curriculum', 'tuition'] or topic(state) == 'career' else []
             new_year, old_year = re.search(YEAR, current), re.search(YEAR, state)
             changed_year = bool(new_year and old_year and new_year.group(1) != old_year.group(1))
             total_question = whole_curriculum(current) or any(x in current for x in ['รวม', 'ทั้งหมด'])
@@ -96,16 +111,22 @@ def resolve(q, history, majors):
         # Materialize first-term wording so later short credit questions inherit it.
         if 'เทอมแรก' in current:
             current = current.replace('เทอมแรก', 'เทอม 1')
+        if topic(current) == 'career' and focus and not explicit_focus:
+            current += ' อาชีพที่ถาม: ' + ' / '.join(focus)
         state = current
-    return state
+    return canonical(q) if re.fullmatch(r'(?:ขอบคุณ|โอเค|เข้าใจแล้ว|ครับ|ค่ะ|คะ)[ !?.]*(?:ครับ|ค่ะ|คะ)?[ !?.]*', canonical(q)) else state
 
 
-def ambiguity(q, majors):
+def ambiguity(q, majors, career_titles=()):
     if len(set(re.findall(YEAR, q))) > 1:
         return 'ต้องการสอบถามข้อมูลปีไหนก่อนครับ'
     if topic(q) == 'curriculum' and len(set(re.findall(TERM, q))) > 1:
         return 'ต้องการสอบถามภาคเรียนไหนก่อนครับ'
     named = mentioned_majors(q, majors)
+    if any(w in q for w in ['อาชีพแรก', 'อาชีพที่สอง', 'อันแรก', 'อันที่สอง', 'งานแรก']) and not career_names(q, career_titles):
+        return 'กรุณาระบุชื่ออาชีพที่ต้องการทราบเพิ่มเติม เพื่อให้เลือกข้อมูลได้ตรงค่ะ'
+    if topic(q) in ['career', 'tuition'] and not named and not career_names(q, career_titles):
+        return 'กรุณาระบุสาขาวิชาหรืออาชีพที่ต้องการทราบเพิ่มเติมค่ะ'
     if not named and whole_curriculum(q) and not any(word in q for word in ['แต่ละสาขา', 'ทุกสาขา', 'ทั้งคณะ']):
         return 'ต้องการทราบหน่วยกิตรวมของสาขาไหน และปีหลักสูตรใดครับ'
     if len(named) > 1:

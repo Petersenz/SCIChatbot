@@ -4,6 +4,7 @@ from datetime import date
 from difflib import SequenceMatcher
 from sqlalchemy import select
 from .db import MODELS, CurriculumCareer, Document
+from .career_scope import career_names
 from .query_understanding import topic, YEAR, mentioned_majors, whole_curriculum, general_topic
 
 
@@ -60,8 +61,8 @@ def retrieve_managed(db, q, majors, curricula):
     year = re.search(YEAR, q)
     year = year.group(1) if year else None
     major = named[0] if len(named) == 1 else None
-    news_rows = list(db.scalars(select(MODELS['news']).order_by(MODELS['news'].id.desc())))
-    event_rows = named_news(q, news_rows)
+    news_rows = [] if kind in ['career', 'tuition'] else list(db.scalars(select(MODELS['news']).order_by(MODELS['news'].id.desc())))
+    event_rows = named_news(q, news_rows) if kind not in ['career', 'tuition'] and not general_topic(q) else []
     if event_rows:
         kind = 'news'
     # Prefer the matching managed topic over loosely similar curriculum chunks.
@@ -110,10 +111,13 @@ def retrieve_managed(db, q, majors, curricula):
                        f'ข้อมูลที่เจ้าหน้าที่บันทึก: {c.degree_name} ช่องปีหลักสูตร {c.curriculum_year} '
                        f'ค่าธรรมเนียมการศึกษาต่อภาคเรียน {c.tuition_fee} บาท ไม่รวมค่าใช้จ่ายอื่นที่ไม่ได้ระบุ')
                 for c in matching if c.tuition_fee is not None]
-    if kind == 'career' and major:
+    if kind == 'career':
+        jobs_model = MODELS['careers']
+        titles = list(db.scalars(select(jobs_model.job_title)))
+        focus = career_names(q, titles)
         # An explicit curriculum year can use the complete career section in
         # the uploaded curriculum, rather than a partially populated registry.
-        if year and not any(w in q for w in ['เงินเดือน', 'ทักษะ', 'รายได้']):
+        if major and year and not focus and not any(w in q for w in ['เงินเดือน', 'ทักษะ', 'รายได้', 'ค่าตอบแทน']):
             evidence = []
             for c in matching:
                 doc = db.scalar(select(Document).where(Document.record_type == 'curricula', Document.record_id == c.id))
@@ -123,26 +127,31 @@ def retrieve_managed(db, q, majors, curricula):
                         f'{c.degree_name} ปีหลักสูตร {c.curriculum_year}\n' + section.group(0).strip()))
             if evidence:
                 return evidence
+        # SQL membership filter precedes role matching; never fall back to
+        # global semantic ranking when a scoped relation is missing.
+        statement = select(jobs_model)
+        if major:
+            statement = statement.join(CurriculumCareer, CurriculumCareer.career_id == jobs_model.id).where(
+                CurriculumCareer.curriculum_id.in_([c.id for c in matching])).distinct()
+        if focus:
+            statement = statement.where(jobs_model.job_title.in_(focus))
+        elif not major:
+            return []
+        jobs = list(db.scalars(statement.order_by(jobs_model.id)))
         sources = []
-        for c in matching:
-            jobs = db.scalars(select(MODELS['careers']).join(CurriculumCareer,
-                CurriculumCareer.career_id == MODELS['careers'].id).where(CurriculumCareer.curriculum_id == c.id)).all()
-            for job in jobs:
-                content = f'{c.degree_name} ปีตามรายการหลักสูตร {c.curriculum_year}\nอาชีพ: {job.job_title}\n{job.job_description or ""}'
-                if job.salary_start is not None:
-                    content += f'\nเงินเดือนเริ่มต้นตามข้อมูลที่บันทึก {job.salary_start} บาท ไม่ใช่การรับประกันรายได้'
-                if job.skill_required:
-                    content += '\nทักษะที่จำเป็น: ' + job.skill_required
-                sources.append(source(job.job_title, f'/records/careers/{job.id}', content))
-        if sources:
-            grouped = {}
-            for item in sources:
-                if item['url'] in grouped:
-                    grouped[item['url']]['text'] += '\n\n' + item['text']
-                else:
-                    grouped[item['url']] = item
-            return list(grouped.values())
-        return None
+        for job in jobs:
+            scope = f'สาขา{major.major_name_th} — อาชีพที่เชื่อมโยงกับหลักสูตรในระบบ' if major else 'อาชีพที่ผู้ใช้ระบุโดยตรง ไม่ยืนยันความสัมพันธ์กับสาขา'
+            content = f'{scope}\nอาชีพ: {job.job_title}\n{job.job_description or ""}'
+            if job.salary_start is not None:
+                content += f'\nค่าประมาณเงินเดือนตามข้อมูลที่บันทึก {job.salary_start} บาท/เดือน ต้องใช้ระดับประสบการณ์และวิธีประมาณในคำอธิบาย ไม่ถือเป็นเงินเดือนจบใหม่โดยอัตโนมัติ'
+            if job.skill_required:
+                content += '\nทักษะที่จำเป็น: ' + job.skill_required
+            item = source(job.job_title, f'/records/careers/{job.id}', content)
+            item['career_fact'] = dict(major=major.major_name_th if major else None,
+                salary=float(job.salary_start) if job.salary_start is not None else None,
+                skills=job.skill_required, description=job.job_description or '')
+            sources.append(item)
+        return sources
     if kind in ['contact', 'history', 'mission'] and not major:
         words = {'contact': ['ติดต่อ'], 'history': ['ประวัติ'], 'mission': ['วิสัยทัศน์', 'พันธกิจ']}[kind]
         rows = db.scalars(select(MODELS['general'])).all()
