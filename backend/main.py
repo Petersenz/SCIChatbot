@@ -642,9 +642,10 @@ def chat(id: str, body: Question, req: Request, db=Depends(db_session)):
         raise HTTPException(422, "กรุณาพิมพ์คำถาม")
     start = time.monotonic()
     # Reconstruct context from this session's questions only. Do not load all
-    # response bodies, citations or other sessions to recover the active scope.
-    history = [SimpleNamespace(user_query=value) for value in db.scalars(
-        select(Chat.user_query).where(Chat.session_id == id).order_by(Chat.id)
+    # response bodies or other sessions. Source identities resolve references;
+    # old generated text is never factual evidence for the new answer.
+    history = [SimpleNamespace(user_query=value, sources=[{'url': url} for url in (sources or [])]) for value, sources in db.execute(
+        select(Chat.user_query, func.jsonb_path_query_array(Chat.sources, '$[*].url', type_=JSONB)).where(Chat.session_id == id).order_by(Chat.id)
     )]
     body, sources, answered, intent, mode = answer(db, q, history)
     if mode == "retrieval_only":

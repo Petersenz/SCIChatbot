@@ -54,8 +54,23 @@ def named_news(q, rows):
     return found
 
 
-def retrieve_managed(db, q, majors, curricula):
+def retrieve_managed(db, q, majors, curricula, plan=None):
     """None delegates to semantic search; [] means this route has no evidence."""
+    # A resolved entity is read by identity, not rediscovered by similarity.
+    if plan and plan.entities and all(e.table in ('news', 'general') for e in plan.entities):
+        selected = []
+        for entity in plan.entities:
+            row = db.get(MODELS[entity.table], entity.id)
+            if not row:
+                continue
+            content = row.content if entity.table == 'news' else row.description
+            year = re.search(YEAR, plan.raw)
+            if year and year.group(1) not in entity.title + ' ' + (content or ''):
+                continue
+            if entity.table == 'news':
+                content = 'ข่าวที่จัดเก็บในระบบ ไม่ยืนยันว่าเป็นข่าวล่าสุดบนเว็บไซต์:\n' + (content or '')
+            selected.append(source(entity.title, f'/records/{entity.table}/{entity.id}', content or ''))
+        return selected
     kind = topic(q.lower())
     named = mentioned_majors(q, majors)
     year = re.search(YEAR, q)

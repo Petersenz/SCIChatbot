@@ -117,13 +117,13 @@ def resolve(q, history, majors, career_titles=()):
     return canonical(q) if re.fullmatch(r'(?:ขอบคุณ|โอเค|เข้าใจแล้ว|ครับ|ค่ะ|คะ)[ !?.]*(?:ครับ|ค่ะ|คะ)?[ !?.]*', canonical(q)) else state
 
 
-def ambiguity(q, majors, career_titles=()):
+def ambiguity(q, majors, career_titles=(), resolved_reference=False):
     if len(set(re.findall(YEAR, q))) > 1:
         return 'ต้องการสอบถามข้อมูลปีไหนก่อนครับ'
     if topic(q) == 'curriculum' and len(set(re.findall(TERM, q))) > 1:
         return 'ต้องการสอบถามภาคเรียนไหนก่อนครับ'
     named = mentioned_majors(q, majors)
-    if any(w in q for w in ['อาชีพแรก', 'อาชีพที่สอง', 'อันแรก', 'อันที่สอง', 'งานแรก']) and not career_names(q, career_titles):
+    if not resolved_reference and any(w in q for w in ['อาชีพแรก', 'อาชีพที่สอง', 'อันแรก', 'อันที่สอง', 'งานแรก']) and not career_names(q, career_titles):
         return 'กรุณาระบุชื่ออาชีพที่ต้องการทราบเพิ่มเติม เพื่อให้เลือกข้อมูลได้ตรงค่ะ'
     if topic(q) in ['career', 'tuition'] and not named and not career_names(q, career_titles):
         return 'กรุณาระบุสาขาวิชาหรืออาชีพที่ต้องการทราบเพิ่มเติมค่ะ'

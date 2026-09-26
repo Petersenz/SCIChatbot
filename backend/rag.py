@@ -9,6 +9,8 @@ from .text_processing import normalize_text, split_evidence
 from .query_understanding import resolve, canonical, ambiguity, topic, TERM, STUDY
 from .structured_evidence import retrieve_managed
 from .career_scope import career_answer
+from .conversation_plan import Catalog, PlannedQuery, make_plan
+from .intent_matching import semantic_static_intent
 logger = logging.getLogger("uvicorn.error")
 from sqlalchemy import select, delete, insert, func
 from sqlalchemy.orm import defer
@@ -103,9 +105,9 @@ def index_document(db, doc):
 
 
 def resolve_query(db, q, history=()):
-    majors = list(db.scalars(select(MODELS['majors'])))
-    titles = list(db.scalars(select(MODELS['careers'].job_title)))
-    return resolve(q, history, majors, titles)
+    if isinstance(q, PlannedQuery) and not history:
+        return q
+    return PlannedQuery(make_plan(q, history, Catalog.load(db)))
 
 
 def retrieve(db, q):
@@ -118,9 +120,13 @@ def retrieve(db, q):
     plan_question = any(t in q for t in ['เทอม', 'ภาคเรียน', 'ภาคการศึกษา', 'แผนการเรียน']) or bool(re.search(r'ปี\s*(?:ที่\s*)?[1-6](?!\d)', q))
 
     curricula = list(db.scalars(select(MODELS["curricula"]).order_by(MODELS["curricula"].id)))
-    if ambiguity(q, majors, list(db.scalars(select(MODELS['careers'].job_title)))):
+    plan = getattr(q, 'plan', None)
+    if ambiguity(q, majors, list(db.scalars(select(MODELS['careers'].job_title))), bool(plan and plan.entities)):
         return []
-    managed = retrieve_managed(db, q, majors, curricula)
+    plan = getattr(q, "plan", None)
+    if plan and plan.clarification:
+        return []
+    managed = retrieve_managed(db, q, majors, curricula, plan=plan)
     if managed is not None:
         logger.info('rag_managed topic=%s major_id=%s sources=%s', topic(q.lower()), major.id if major else None, len(managed))
         return managed
@@ -172,11 +178,14 @@ def retrieve(db, q):
                         "similarity": 1.0,
                     }
                 ]
-    vector = embed([q])[0]
-    distance = Chunk.embedding.cosine_distance(vector)
-    stmt = select(Chunk, Document, distance.label("distance")).join(
+    stmt = select(Chunk, Document).join(
         Document, Chunk.document_id == Document.id
     ).options(defer(Document.content))
+    if plan:
+        stmt = stmt.where(Document.record_type.in_(plan.allowed_tables))
+        if plan.entities:
+            from sqlalchemy import or_, and_
+            stmt = stmt.where(or_(*[and_(Document.record_type == e.table, Document.record_id == e.id) for e in plan.entities]))
     if not any(t in q for t in ["ประวัติ", "ก่อตั้ง", "อดีต"]):
         stmt = stmt.where(~Document.url.endswith("/history"))
     # Route broad questions to authoritative overview pages before semantic ranking.
@@ -192,6 +201,8 @@ def retrieve(db, q):
             ids = []
             for doc in db.execute(select(Document.id, Document.record_type, Document.record_id,
                                          Document.title, func.substr(Document.content, 1, 2000).label('content'))):
+                if plan and doc.record_type not in plan.allowed_tables:
+                    continue
                 record = next((c for c in curricula if doc.record_type == 'curricula' and c.id == doc.record_id), None)
                 belongs = record.major_id == major.id if record else major.major_name_th in normalize_text(doc.title or '')
                 if not belongs:
@@ -204,6 +215,8 @@ def retrieve(db, q):
                 if year and year not in evidence_years:
                     continue
                 ids.append(doc.id)
+            if not ids:
+                return []
             stmt = stmt.where(Document.id.in_(ids))
     course_codes = re.findall(r'\b[A-Z]{4}\d{4}\b', q.upper())
     if course_codes:
@@ -221,7 +234,9 @@ def retrieve(db, q):
         # Filter all pages before top-k; otherwise late-page evidence can disappear.
         pattern = r'ปีที่\s*' + (study or r'\d+') + r'\s*/\s*ภาคการศึกษาที่\s*' + term
         stmt = stmt.where(Chunk.content.op('~')(pattern))
-    rows = db.execute(stmt.order_by(distance).limit(40)).all()
+    vector = embed([q])[0]
+    distance = Chunk.embedding.cosine_distance(vector)
+    rows = db.execute(stmt.add_columns(distance.label("distance")).order_by(distance).limit(40)).all()
     headers = dict(db.execute(select(Document.id, func.substr(Document.content, 1, 1600))
                              .where(Document.id.in_({d.id for _, d, _ in rows}))).all())
     logger.info('rag_retrieve major_id=%s year=%s study_year=%s term=%s candidates=%s',
@@ -408,37 +423,34 @@ def answer(db, q, history):
 
 
 def _answer(db, q, history):
-    intents = db.scalars(
-        select(MODELS["intents"]).where(MODELS["intents"].is_active == True)
-    ).all()
     query = resolve_query(db, q, history)
-    clarify = ambiguity(query, list(db.scalars(select(MODELS['majors']))), list(db.scalars(select(MODELS['careers'].job_title))))
+    plan = getattr(query, 'plan', None)
+    if plan and plan.static_response:
+        return plan.static_response, [], True, plan.intent_id, 'rule_based'
+    if plan and plan.route is None:
+        try:
+            matched = semantic_static_intent(q, plan.intent_candidates, embed, route=plan.route)
+        except Exception as exc:
+            # Unavailable embedding must not prevent the normal clarification.
+            logger.warning('intent_semantic_unavailable type=%s', type(exc).__name__)
+            matched = None
+        if matched:
+            selected, score = matched
+            logger.info('intent_matched method=semantic intent_id=%s similarity=%.3f', selected.id, score)
+            return selected.static_response, [], True, selected.id, 'rule_based'
+    clarify = (plan.clarification if plan else None) or ambiguity(query, list(db.scalars(select(MODELS['majors']))), list(db.scalars(select(MODELS['careers'].job_title))), bool(plan and plan.entities))
     if clarify:
-        return clarify, [], False, None, 'clarification'
-    for intent in intents:
-        keywords = [
-            x.strip() for x in (intent.prompt_context or "").split(",") if x.strip()
-        ]
-        if (
-            intent.action_type == "rule_based"
-            and any(re.fullmatch(re.escape(x.lower()) + r"[ !?.]*(?:ครับ|ค่ะ|คะ)?[ !?.]*", q.strip().lower()) for x in keywords)
-            and intent.static_response
-        ):
-            return intent.static_response, [], True, intent.id, "rule_based"
+        return clarify, [], False, plan.intent_id if plan else None, 'clarification'
+    intent = SimpleNamespace(id=plan.intent_id, prompt_context=plan.intent_context) if plan and plan.intent_id else None
+    if plan:
+        logger.info('rag_plan route=%s transition=%s entities=%s tables=%s intent_id=%s',
+                    plan.route, plan.transition, [(e.table, e.id) for e in plan.entities], plan.allowed_tables, plan.intent_id)
     sources = retrieve(db, query)
     if (len(sources) > 1 and all(s['url'].startswith('/records/news/') for s in sources)
             and any(w in query for w in ['วันไหน', 'เมื่อไหร่', 'ที่ไหน', 'วันใด'])
             and not any(w in query for w in ['ล่าสุด', 'แต่ละ', 'ทั้งหมด', 'เปรียบเทียบ'])):
         return ('พบกิจกรรมที่ใกล้เคียงกันหลายรายการ หมายถึงกิจกรรมไหนครับ\n' +
                 '\n'.join('• ' + s['title'] for s in sources)), [], False, None, 'clarification'
-    candidates = [i for i in intents if i.action_type == "rag"]
-    intent = max(
-        candidates,
-        key=lambda i: sum(
-            t.strip() in q for t in (i.prompt_context or "").split(",") if t.strip()
-        ),
-        default=None,
-    )
     if not sources and topic(query) == 'career':
         named = [m.major_name_th for m in db.scalars(select(MODELS['majors'])) if m.major_name_th in query]
         scope = 'สาขา' + named[0] if len(named) == 1 else 'อาชีพที่ระบุ'
