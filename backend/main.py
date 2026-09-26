@@ -13,6 +13,7 @@ from .db import *
 from .security import hash_password, verify_password, digest
 from .rag import answer, index_document, embed
 from .source_links import decorate_sources
+from .error_responses import install_error_handling, logger as api_logger
 from .text_processing import inspect_pdf, PDFValidationError, MAX_PDF_BYTES
 
 
@@ -42,7 +43,7 @@ def limit(key, n, seconds):
         t = time.time()
         rates[key] = [x for x in rates[key] if t - x < seconds]
         if len(rates[key]) >= n:
-            raise HTTPException(429, "กรุณารอสักครู่แล้วลองใหม่")
+            raise HTTPException(429, "กรุณารอสักครู่แล้วลองใหม่", headers={"Retry-After": str(max(1, int(seconds - (t - rates[key][0])) + 1))})
         rates[key].append(t)
 
 
@@ -69,6 +70,8 @@ async def guards(req, call_next):
     response.headers["Cache-Control"] = "no-store"
     return response
 
+
+install_error_handling(app)
 
 def current_user(req: Request, db=Depends(db_session)):
     token = req.cookies.get("sci_auth", "")
@@ -644,6 +647,8 @@ def chat(id: str, body: Question, req: Request, db=Depends(db_session)):
         select(Chat.user_query).where(Chat.session_id == id).order_by(Chat.id)
     )]
     body, sources, answered, intent, mode = answer(db, q, history)
+    if mode == "retrieval_only":
+        api_logger.warning("chat_generation_degraded request_id=%s mode=retrieval_only elapsed_ms=%s",getattr(req.state,"request_id",""),int((time.monotonic()-start)*1000))
     item = Chat(
         session_id=id,
         user_query=q,

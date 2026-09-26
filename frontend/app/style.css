@@ -1583,3 +1583,23 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 @keyframes menu-reveal { from {opacity:0; transform:translateY(-3px);} to {opacity:1; transform:translateY(0);} }
 @media (hover:none),(max-width:768px) { .sidebar-conversation-menu button { min-height:44px; } }
 @media (prefers-reduced-motion:reduce) { .sidebar-conversation-menu,.sidebar-conversation-menu button,.staff-access,.staff-access *,.chat-shell .chat-main,.chat-shell .chat-side,.login-page .login-card,.login-page .back { animation:none !important; transition:none !important; } .chat-shell.is-leaving .chat-main,.chat-shell.is-leaving .chat-side { opacity:1; transform:none; } }
+
+/* Thinking/notice components inherit SCI typography and palette. */
+:root { --status-info:#536575; --status-warn:#875c0b; --status-error:#a62937; --status-error-bg:#fff8f8; --status-info-bg:#f7f9fb; --status-warn-bg:#fff9e9; --shining-base:#62625b; --shining-highlight:#b3a677; }
+.shining-text { display:inline-block; background:linear-gradient(110deg,var(--shining-base) 35%,var(--shining-highlight) 50%,var(--shining-base) 75%); background-size:200% 100%; background-clip:text; -webkit-background-clip:text; color:transparent; font-size:14px; font-weight:400; }
+.thinking-status { margin:8px 0 24px 46px; min-height:28px; }
+.thinking-status small { display:block; color:var(--muted); font-size:12px; margin-top:6px; }
+.status-notice { display:flex; align-items:flex-start; gap:10px; border:1px solid currentColor; border-radius:12px; padding:12px 14px; margin:12px 0; font-size:14px; line-height:1.6; }
+.status-notice > svg { width:18px; height:18px; flex-shrink:0; margin-top:2px; }
+.status-notice > div { min-width:0; overflow-wrap:anywhere; }
+.status-error { color:var(--status-error); background:var(--status-error-bg); }
+.status-info { color:var(--status-info); background:var(--status-info-bg); }
+.status-warning { color:var(--status-warn); background:var(--status-warn-bg); }
+.status-notice.chat-error { margin:8px 24px; }
+@media (prefers-reduced-motion:reduce) { .shining-text { background:none; color:var(--shining-base); } }
+@media (forced-colors:active) { .shining-text { background:none; color:CanvasText; } }
+@media (max-width:768px) { .thinking-status { margin-left:34px; } .status-notice.chat-error { margin:8px 12px; } }
+
+.notice-action { display:block; margin-top:8px; padding:6px 10px; font-size:13px; border:1px solid currentColor; background:transparent; color:inherit; border-radius:7px; min-height:36px; }
+.notice-action:hover { background:var(--surface); }
+.notice-action:focus-visible { outline:2px solid currentColor; outline-offset:2px; }

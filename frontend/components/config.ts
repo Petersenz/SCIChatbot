@@ -1,3 +1,4 @@
+import {requestJson} from "./request";
 import { publicUrl } from "./paths";
 export type Field = {
   key: string;
@@ -129,23 +130,5 @@ export const configs: Record<string, Config> = {
   },
 };
 export async function api(path: string, method = "GET", body?: unknown) {
-  const r = await fetch(publicUrl("/api" + path), {
-    method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const raw = await r.text();
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    throw new Error("ระบบเชื่อมต่อขัดข้องหรือใช้เวลาตอบกลับนาน กรุณารีเฟรชเพื่อตรวจสอบข้อมูลก่อนลองอีกครั้ง");
-  }
-  if (!r.ok)
-    throw new Error(
-      typeof data.detail === "string"
-        ? data.detail
-        : "ไม่สามารถดำเนินการได้ กรุณาตรวจสอบข้อมูล",
-    );
-  return data;
+ return requestJson(publicUrl("/api"+path),{method,headers:body?{"Content-Type":"application/json"}:undefined,body:body?JSON.stringify(body):undefined},path.startsWith("/manage/")?600000:120000);
 }

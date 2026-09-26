@@ -1,5 +1,8 @@
 "use client";
 import { createPortal } from "react-dom";
+import {ThinkingIndicator} from "@/components/ui/thinking-indicator";
+import {StatusNotice} from "@/components/ui/status-notice";
+import {requestJson, remainingThinkingMs} from "./request";
 import { FlowButton } from "@/components/ui/flow-button";
 import { useEffect, useState, useRef, FormEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -300,9 +303,7 @@ function Login({ onLogin }: { onLogin: (u: Row) => void }) {
             />
           </label>
           {error && (
-            <p className="alert" role="alert">
-              {error}
-            </p>
+            <StatusNotice className="">{error}</StatusNotice>
           )}
           <button className="primary wide" disabled={busy}>
             {busy ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
@@ -399,6 +400,7 @@ function StaffEntry({staff, onLeave}: {staff: Row | null; onLeave: (leaving: boo
 }
 
 function ChatApp() {
+  const sendLock=useRef(false);
   const [leaving, setLeaving] = useState(false);
   const [sessions, setSessions] = useState<Row[]>([]);
   const [active, setActive] = useState<string | null>(null);
@@ -469,10 +471,13 @@ function ChatApp() {
     setMenu(false);
   }
   async function send(text = input) {
-    if (!text.trim() || busy) return;
+    if (!text.trim() || busy || sendLock.current) return;
+    sendLock.current=true;
     setBusy(true);
     setError("");
     setInput("");
+    const started=performance.now();
+    setMessages(m=>[...m,{id:-1,user_query:text,bot_response:""}]);
     try {
       let id = active;
       if (!id) {
@@ -480,18 +485,20 @@ function ChatApp() {
         id = s.id;
         setActive(id);
       }
-      const pending = { id: -1, user_query: text, bot_response: "" };
-      setMessages((m) => [...m, pending]);
       const item = await api("/conversations/" + id + "/messages", "POST", {
         message: text,
       });
+      // Presentation delay only; backend/API latency remains unchanged.
+      const remaining=remainingThinkingMs(started,performance.now());
+      if(remaining>0) await new Promise(resolve=>setTimeout(resolve,remaining));
       setMessages((m) => [...m.filter((x) => x.id !== -1), item]);
-      await refresh();
+      void refresh().catch(()=>setError("คำตอบบันทึกแล้ว แต่โหลดรายการประวัติไม่สำเร็จ กรุณารีเฟรชประวัติ ไม่ต้องส่งคำถามซ้ำ"));
     } catch (e) {
       setError((e as Error).message);
       setMessages((m) => m.filter((x) => x.id !== -1));
       setInput(text);
     } finally {
+      sendLock.current=false;
       setBusy(false);
     }
   }
@@ -669,18 +676,20 @@ function ChatApp() {
                 </div>
               ))}
               {busy && (
-                <p role="status" className="typing">
-                  กำลังค้นหาข้อมูล<span>…</span>
-                </p>
+                <ThinkingIndicator />
               )}
               <div ref={end} />
             </div>
           )}
         </div>
         {error && (
-          <p className="alert chat-error" role="alert">
-            {error}
-          </p>
+          <StatusNotice className="chat-error">{error}
+            <button type="button" className="notice-action" disabled={busy} onClick={async()=>{
+              setError("");
+              try {await refresh(); if(active) setMessages(await api("/conversations/"+active));}
+              catch(e){setError((e as Error).message);}
+            }}>ตรวจสอบประวัติอีกครั้ง</button>
+          </StatusNotice>
         )}
         <div className="composer-wrap">
           {active &&
@@ -902,8 +911,8 @@ function Management({ entity, user }: { entity: string; user: Row }) {
         data,
       );
       setEditing(null);
-      await load();
       setNotice(["บันทึกข้อมูลแล้ว", ...(saved.ingestion_warnings || [])].join(" — "));
+      try {await load();} catch {setError("บันทึกข้อมูลแล้ว แต่โหลดรายการไม่สำเร็จ กรุณาโหลดหน้านี้ใหม่ ไม่ต้องบันทึกซ้ำ");}
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -1175,12 +1184,11 @@ function FieldInput({
             const limit = (f.key === "file_url" ? 32 : 8) * 1024 * 1024;
             if (file.size > limit) { setError("ไฟล์มีขนาดเกินที่กำหนด"); return; }
             setUploading(true);
+            setError("");
             const body = new FormData();
             body.append("file", file);
             try {
-              const r = await fetch(publicUrl("/api/uploads"), { method: "POST", body });
-              const data = await r.json();
-              if (!r.ok) throw new Error(data.detail);
+              const data = await requestJson(publicUrl("/api/uploads"), { method: "POST", body },600000);
               setUpload(data.url);
               setError("");
             } catch (e) {
@@ -1192,7 +1200,7 @@ function FieldInput({
         />
         {f.key === "file_url" && <small>PDF ไม่เกิน 32 MB และ 250 หน้า · อัปโหลดไฟล์เพื่อใช้ค้นหาข้อมูล ลิงก์ใช้เปิดต้นฉบับ</small>}
         {uploading && <span role="status">กำลังอัปโหลด…</span>}
-        {error && <span role="alert">{error}</span>}
+        {error && <StatusNotice>{error}</StatusNotice>}
       </label>
     );
   return (
