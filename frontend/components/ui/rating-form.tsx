@@ -1,6 +1,6 @@
 "use client";
 import {useId,useRef,useState} from "react";
-import {Star,LoaderCircle} from "lucide-react";
+import {Star,LoaderCircle,Check,SquarePen,Clock} from "lucide-react";
 import {StatusNotice} from "./status-notice";
 const labels=["","น้อยที่สุด","น้อย","ปานกลาง","มาก","มากที่สุด"];
 export function RatingForm({initial=0,onRate,onLater,onNew}: {initial?:number;onRate:(value:number)=>Promise<void>;onLater:()=>void;onNew:()=>void}) {
@@ -23,7 +23,7 @@ export function RatingForm({initial=0,onRate,onLater,onNew}: {initial?:number;on
    <p className="rating-caption" aria-live="polite">{shown ? `${shown} / 5 · ${labels[shown]}` : "เลือกดาวเพื่อให้คะแนน"}</p>
   </fieldset>
   {error && <StatusNotice>{error}</StatusNotice>}
-  <button className="primary wide rating-submit" type="submit" disabled={!value||busy}>{busy?<><LoaderCircle className="rating-spinner" aria-hidden="true"/>กำลังบันทึก…</>:"บันทึกคะแนน"}</button>
-  <div className="rating-secondary"><button type="button" disabled={busy} onClick={onNew}>เริ่มสนทนาใหม่</button><button type="button" disabled={busy} onClick={onLater}>ไว้ภายหลัง</button></div>
+  <button className="primary wide rating-submit" type="submit" disabled={!value||busy}>{busy?<><LoaderCircle className="rating-spinner" aria-hidden="true"/>กำลังบันทึก…</>:<><Check aria-hidden="true"/>บันทึกคะแนน</>}</button>
+  <div className="rating-secondary"><button type="button" disabled={busy} onClick={onNew}><SquarePen aria-hidden="true"/>เริ่มสนทนาใหม่</button><button type="button" disabled={busy} onClick={onLater}><Clock aria-hidden="true"/>ไว้ภายหลัง</button></div>
  </form>;
 }

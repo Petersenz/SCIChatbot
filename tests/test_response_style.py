@@ -47,7 +47,7 @@ def test_generated_answer_uses_style_and_keeps_source(monkeypatch):
     prompt = client.models.generate_content.call_args.kwargs["contents"]
     assert RESPONSE_STYLE in client.models.generate_content.call_args.kwargs["config"].system_instruction
     assert RESPONSE_STYLE in prompt and prompt.index(RESPONSE_STYLE) < prompt.index("หลักฐาน:\n")
-    assert body == "• หน่วยกิตรวม 121 [1]" and answered and mode == "gemini"
+    assert body == "ข้อมูลที่พบมีดังนี้ค่ะ\n• หน่วยกิตรวม 121 [1]" and answered and mode == "gemini"
     assert len(sources) == 1
     generation_cache.clear()
 

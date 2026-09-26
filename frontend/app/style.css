@@ -1611,7 +1611,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 @keyframes sci-backdrop { from {opacity:0;} to {opacity:1;} }
 @keyframes sci-star-select { 0% {transform:scale(.9);} 60% {transform:scale(1.15);} 100% {transform:scale(1);} }
 @keyframes sci-spin { to {transform:rotate(360deg);} }
-.admin-main { animation:sci-arrive var(--motion-enter) var(--motion-ease) both; }
+.admin-main { animation:none; }
 dialog[open] { animation:sci-dialog var(--motion-ui) var(--motion-ease) both; }
 dialog[open]::backdrop { animation:sci-backdrop var(--motion-ui) ease both; }
 .chat-shell .welcome h1 { animation:sci-arrive 420ms var(--motion-ease) both; }
@@ -1673,3 +1673,61 @@ dialog:has(.rating-form) { width:min(500px,calc(100vw - 32px)); }
 @media (prefers-reduced-motion:reduce) {
  .chat-shell .welcome,.chat-shell .welcome *, .bot-row.answer-enter { animation:none !important; }
 }
+
+/* Compact answer actions, while preserving touch target size. */
+.chat-shell .feedback { align-items:center;gap:4px;flex-wrap:wrap; }
+.chat-shell .feedback .icon { width:32px;height:32px;min-width:32px;min-height:32px;padding:7px;border-radius:8px; }
+.chat-shell .feedback .icon svg { width:17px;height:17px; }
+.copy-error { font-size:12px;color:var(--status-error);flex-basis:100%; }
+@media (pointer:coarse) { .chat-shell .feedback .icon { width:44px;height:44px; } }
+
+/* Stable back-office shell and a compact, labeled date range. */
+.date-filter.report-date-filter { display:flex;flex-direction:column;align-items:stretch;gap:12px;padding:16px 18px;background:var(--white,#fff);border:1px solid var(--border,#e1e4ea);border-radius:12px;margin-bottom:20px; }
+.date-filter-heading { display:flex;align-items:baseline;gap:12px;flex-wrap:wrap; }
+.date-filter-heading strong { font-size:14px; }
+.date-filter-heading small { color:var(--muted);font-size:12px; }
+.date-filter-controls { display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap; }
+.report-date-filter label { flex:0 1 180px;gap:6px;font-size:12px; }
+.report-date-filter input { width:100%;min-height:40px;border-radius:8px;padding:8px 10px;background:#fff; }
+.date-range-separator { align-self:flex-end;padding-bottom:10px;color:var(--muted); }
+.report-date-filter button { min-height:40px;border-radius:8px;padding:8px 14px;display:inline-flex;gap:7px;align-items:center;justify-content:center;font-size:13px; }
+.report-reset { background:transparent;border:1px solid var(--border,#e1e4ea);color:var(--muted); }
+.report-loading { color:var(--muted);font-size:13px; }
+@media(max-width:600px) { .report-date-filter label { flex:1 1 120px;min-width:0; } .date-range-separator { display:none; } .report-date-filter .report-apply { flex:1 1 100%; } .report-date-filter .report-reset { flex:1 1 100%; } }
+
+/* One pagination control for all management lists and reports. */
+.table-pagination { display:flex; align-items:center; flex-wrap:wrap; gap:16px; padding:16px 22px; border-top:1px solid var(--border); font-size:13px; }
+.pagination-summary { color:var(--muted); margin-right:auto; font-variant-numeric:tabular-nums; }
+.table-pagination .pagination-size { display:flex; flex-direction:row; align-items:center; gap:10px; white-space:nowrap; }
+.pagination-size select { width:72px; min-height:36px; padding:6px 10px; border:1px solid var(--border); border-radius:10px; background:white; color:inherit; font:inherit; cursor:pointer; }
+.pagination-pages { display:flex; align-items:center; gap:4px; }
+.pagination-pages button { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:34px; height:36px; padding:0 8px; border:1px solid transparent; border-radius:9px; background:transparent; font:inherit; font-weight:500; color:inherit; box-shadow:none; }
+.pagination-pages button:hover:not(:disabled) { background:#f4f5f6; transform:none; }
+.pagination-pages button[aria-current="page"] { background:#fff5d5; border-color:#ebcc70; color:#5b4300; font-weight:700; }
+.pagination-pages button:disabled { opacity:.38; cursor:default; }
+.pagination-pages svg { width:16px; height:16px; }
+.page-gap { min-width:20px; text-align:center; color:var(--muted); }
+.pagination-pages button:focus-visible,.pagination-size select:focus-visible { outline:2px solid #9b7000; outline-offset:3px; }
+@media(max-width:700px) {
+ .table-pagination { gap:12px; padding:14px 12px; }
+ .pagination-pages { width:100%; justify-content:center; gap:2px; }
+ .pagination-pages button { min-width:30px; padding:0 5px; }
+ .pagination-pages .page-direction span { display:none; }
+ .page-gap { min-width:14px; }
+}
+@media(pointer:coarse) { .pagination-pages button,.pagination-size select { min-height:44px; } }
+
+/* Consistent labelled actions; preserve specialised chat/flow-button layouts. */
+.actions button,.login-card form > button,.rating-secondary button,.rating-submit,.notice-action { display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+.actions button > svg,.rating-secondary button > svg,.rating-submit > svg,.notice-action > svg { width:17px; height:17px; flex-shrink:0; }
+.review-action { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:36px; padding:7px 12px; border-radius:10px; white-space:nowrap; font-size:13px; font-weight:500; transition:background .18s,border-color .18s,box-shadow .18s; }
+.review-action > svg { width:16px; height:16px; flex-shrink:0; }
+.review-action.is-pending { background:#fff9e9; border-color:#ebd899; color:#765300; }
+.review-action.is-reviewed { background:#f0f9f4; border-color:#bddbc9; color:#24603e; }
+.review-action:hover:not(:disabled) { border-color:currentColor; box-shadow:0 2px 6px #1822300d; transform:none; }
+.review-action:focus-visible { outline:2px solid #9b7000; outline-offset:3px; }
+.review-action:disabled { opacity:.65; cursor:wait; }
+.button-spinner { animation:button-spin 1s linear infinite; }
+@keyframes button-spin { to { transform:rotate(360deg); } }
+@media(pointer:coarse) { .review-action { min-height:44px; } }
+@media(prefers-reduced-motion:reduce) { .button-spinner { animation:none; } .review-action { transition:none; } }

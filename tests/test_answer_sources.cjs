@@ -1,0 +1,17 @@
+const fs=require('fs'),assert=require('assert'),vm=require('vm');
+const ts=require('../frontend/node_modules/typescript');
+const React=require('../frontend/node_modules/react');
+const {renderToStaticMarkup}=require('../frontend/node_modules/react-dom/server');
+const code=fs.readFileSync(require('path').join(__dirname,'../frontend/components/App.tsx'),'utf8');
+const component=code.slice(code.indexOf('function AdditionalSources('),code.indexOf('function CopyAnswer('));
+const scope={React,sourceHref:x=>x,FiBookOpen:()=>null,FiExternalLink:()=>null};
+vm.createContext(scope);vm.runInContext(ts.transpileModule(component,{compilerOptions:{jsx:ts.JsxEmit.React,target:ts.ScriptTarget.ES2022}}).outputText,scope);
+const a={title:'Official A',url:'https://example.com/a'},b={title:'Official B',url:'https://example.com/b'};
+const render=(text,sources)=>renderToStaticMarkup(React.createElement(scope.AdditionalSources,{text,sources}));
+assert.equal(render('Answer [1]',[a]),'');
+assert.equal(render('Answer [1]',[a,{...a}]),'');
+assert.ok(render('Answer [1]',[a,b]).includes('Official B'));
+assert.ok(!render('Answer [1]',[a,b]).includes('Official A'));
+assert.ok(render('Fallback without citation',[a]).includes('Official A'));
+assert.ok(render('Bad reference [8]',[a]).includes('Official A'));
+console.log('PASS: duplicate references hidden; additional, fallback and invalid-citation sources retained');

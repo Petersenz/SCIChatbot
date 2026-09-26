@@ -1,4 +1,6 @@
 "use client";
+import { ReviewButton } from "@/components/ui/review-button";
+import { Pagination } from "@/components/ui/pagination";
 import { createPortal } from "react-dom";
 import {RatingForm} from "@/components/ui/rating-form";
 import {ThinkingIndicator} from "@/components/ui/thinking-indicator";
@@ -8,12 +10,17 @@ import { FlowButton } from "@/components/ui/flow-button";
 import { useEffect, useState, useRef, useId, ReactNode, FormEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  FiSave,
+  FiLogIn,
+  FiLoader,
+  FiRefreshCw,
   FiMenu,
   FiMoreHorizontal,
   FiEdit,
   FiPlus,
   FiArrowUp,
   FiMessageSquare,
+  FiCopy,
   FiThumbsUp,
   FiThumbsDown,
   FiStar,
@@ -226,6 +233,11 @@ export default function App() {
                 key={k}
                 className={page === k ? "active" : ""}
                 href={publicUrl("/admin/" + k)}
+                onClick={(event) => {
+                  if(event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                  event.preventDefault();
+                  if(page !== k) window.history.pushState(null, "", publicUrl("/admin/" + k));
+                }}
                 aria-current={page === k ? "page" : undefined}
               >
                 <Icon />
@@ -247,7 +259,7 @@ export default function App() {
           </button>
         </div>
       </aside>
-      <main id="main" className="admin-main" key={page}>
+      <main id="main" className="admin-main">
         {error && (
           <p role="alert" className="alert">
             {error}
@@ -258,7 +270,7 @@ export default function App() {
         ) : page === "profile" ? (
           <Profile user={user} onChange={setUser} />
         ) : (
-          <Reports kind={page} />
+          <Reports key={page} kind={page} />
         )}
       </main>
     </div>
@@ -308,7 +320,7 @@ function Login({ onLogin }: { onLogin: (u: Row) => void }) {
             <StatusNotice className="">{error}</StatusNotice>
           )}
           <button className="primary wide" disabled={busy}>
-            {busy ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
+            {busy ? <FiLoader className="button-spinner" aria-hidden="true"/> : <FiLogIn aria-hidden="true"/>}{busy ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
           </button>
         </form>
         <p className="login-footer">
@@ -324,6 +336,31 @@ function Login({ onLogin }: { onLogin: (u: Row) => void }) {
 function sourceHref(url: string) {
   if (/^https?:\/\//i.test(url) || /^\/(?!\/)/.test(url)) return publicUrl(url);
   return undefined;
+}
+function AdditionalSources({text, sources}: {text:string; sources:Row[]}) {
+  const cited = new Set(Array.from(text.matchAll(/\[(\d+)\]/g), m => Number(m[1])-1));
+  const seen = new Set<string>();
+  sources.forEach((source,index)=> { if(cited.has(index)) seen.add(sourceHref(source.external_url || source.url || "")); });
+  const extra = sources.filter(source=> {
+    const href=sourceHref(source.external_url || source.url || "");
+    if(!href || seen.has(href)) return false;
+    seen.add(href); return true;
+  });
+  if(!extra.length) return null;
+  return <details className="sources"><summary><FiBookOpen /> แหล่งข้อมูลเพิ่มเติม · {extra.length}</summary>
+    {extra.map(source=><a key={source.url} href={sourceHref(source.external_url || source.url || "")} target="_blank" rel="noopener noreferrer"><span>{source.title}</span><FiExternalLink /></a>)}
+  </details>;
+}
+function CopyAnswer({text, sources}: {text:string; sources:Row[]}) {
+  const [state,setState]=useState<"idle"|"copied"|"failed">("idle");
+  useEffect(()=> { if(state==="idle") return; const timer=setTimeout(()=>setState("idle"),3000);return()=>clearTimeout(timer); },[state]);
+  return <><button type="button" className="icon" title="คัดลอกคำตอบ" aria-label={state==="copied"?"คัดลอกแล้ว":"คัดลอกคำตอบ"} onClick={async()=>{
+    try {
+      const references=sources.map((source,index)=>`[${index+1}] ${source.title}: ${new URL(sourceHref(source.external_url || source.url || ""),window.location.origin).href}`).join("\n");
+      await navigator.clipboard.writeText(text+(references?"\n\n"+references:""));setState("copied");
+    } catch {setState("failed");}
+  }}>{state==="copied"?<FiCheck />:<FiCopy />}</button>
+    <span className={state==="failed"?"copy-error":"rating-sr-only"} role="status">{state==="copied"?"คัดลอกคำตอบแล้วค่ะ":state==="failed"?"คัดลอกไม่ได้ กรุณาเลือกข้อความแล้วคัดลอกด้วยตนเองค่ะ":""}</span></>;
 }
 function AnswerText({ text, sources }: { text: string; sources: Row[] }) {
   const render = (value: string) => value.split(/(\[\d+\])/g).map((part, index) => {
@@ -648,25 +685,9 @@ function ChatApp() {
                             <span>{s.title}</span>
                           </a>
                         ))}
-                        {m.sources?.length > 0 && (
-                          <details className="sources">
-                            <summary><FiBookOpen /> แหล่งข้อมูล · {m.sources.length}</summary>
-                            {m.sources.map((s: Row, i: number) => (
-                              <a
-                                href={sourceHref(s.external_url || s.url || "")}
-                                key={s.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                <span>
-                                  {i + 1}. {s.title}
-                                </span>
-                                <FiExternalLink />
-                              </a>
-                            ))}
-                          </details>
-                        )}
+                        <AdditionalSources text={m.bot_response} sources={m.sources || []} />
                         <div className="feedback">
+                          <CopyAnswer text={m.bot_response} sources={m.sources || []} />
                           <button
                             aria-label="ถูกใจคำตอบ"
                             aria-pressed={m.is_helpful === true}
@@ -702,7 +723,7 @@ function ChatApp() {
               setError("");
               try {await refresh(); if(active) setMessages(await api("/conversations/"+active));}
               catch(e){setError((e as Error).message);}
-            }}>ตรวจสอบประวัติอีกครั้ง</button>
+            }}><FiRefreshCw aria-hidden="true"/>ตรวจสอบประวัติอีกครั้ง</button>
           </StatusNotice>
         )}
         <div className="composer-wrap">
@@ -792,9 +813,9 @@ function ChatApp() {
             </label>
             <div className="actions">
               <button type="button" onClick={() => setModal(null)}>
-                ยกเลิก
+                <FiX aria-hidden="true"/>ยกเลิก
               </button>
-              <button className="primary">บันทึก</button>
+              <button className="primary"><FiSave aria-hidden="true"/>บันทึก</button>
             </div>
           </form>
         </Modal>
@@ -803,7 +824,7 @@ function ChatApp() {
         <Modal title="ลบบทสนทนา" close={() => setModal(null)}>
           <p>ต้องการลบบทสนทนา “{modalSession?.title}” หรือไม่?</p>
           <div className="actions">
-            <button onClick={() => setModal(null)}>ยกเลิก</button>
+            <button onClick={() => setModal(null)}><FiX aria-hidden="true"/>ยกเลิก</button>
             <button
               className="danger"
               onClick={async () => {
@@ -817,7 +838,7 @@ function ChatApp() {
                 }
               }}
             >
-              ลบบทสนทนา
+              <FiTrash2 aria-hidden="true"/>ลบบทสนทนา
             </button>
           </div>
         </Modal>
@@ -845,6 +866,7 @@ function Management({ entity, user }: { entity: string; user: Row }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const load = () => api("/manage/" + entity).then(setRows);
   useEffect(() => {
     Promise.all([load(), api("/lookups").then(setLookups)]).catch((e) =>
@@ -854,7 +876,9 @@ function Management({ entity, user }: { entity: string; user: Row }) {
   const filtered = rows.filter((r) =>
     JSON.stringify(r).toLowerCase().includes(search.toLowerCase()),
   );
-  const visible = filtered.slice((page - 1) * 8, page * 8);
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
+  useEffect(() => { setPage(currentPage); }, [currentPage]);
+  const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   function display(r: Row, k: string) {
     const v = r[k];
     if (v == null || v === "") return "—";
@@ -1013,21 +1037,8 @@ function Management({ entity, user }: { entity: string; user: Row }) {
           </table>
           {visible.length === 0 && <p className="empty">ไม่พบข้อมูล</p>}
         </div>
-        <div className="pagination">
-          <span>ทั้งหมด {filtered.length} รายการ</span>
-          <button disabled={page === 1} onClick={() => setPage(page - 1)}>
-            ก่อนหน้า
-          </button>
-          <span>
-            {page} / {Math.max(1, Math.ceil(filtered.length / 8))}
-          </span>
-          <button
-            disabled={page * 8 >= filtered.length}
-            onClick={() => setPage(page + 1)}
-          >
-            ถัดไป
-          </button>
-        </div>
+        <Pagination total={filtered.length} page={currentPage} pageSize={pageSize}
+          onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
       </section>
       {editing && (
         <Modal
@@ -1069,10 +1080,10 @@ function Management({ entity, user }: { entity: string; user: Row }) {
                 disabled={busy}
                 onClick={() => setEditing(null)}
               >
-                ยกเลิก
+                <FiX aria-hidden="true"/>ยกเลิก
               </button>
               <button className="primary" disabled={busy}>
-                {busy ? "กำลังบันทึก…" : "บันทึกข้อมูล"}
+                {busy ? <FiLoader className="button-spinner" aria-hidden="true"/> : <FiSave aria-hidden="true"/>}{busy ? "กำลังบันทึก…" : "บันทึกข้อมูล"}
               </button>
             </div>
           </form>
@@ -1082,7 +1093,7 @@ function Management({ entity, user }: { entity: string; user: Row }) {
         <Modal title={"ลบ" + cfg.single} close={() => setDeleting(null)}>
           <p>ต้องการลบ “{display(deleting, cfg.columns[0])}” หรือไม่?</p>
           <div className="actions">
-            <button onClick={() => setDeleting(null)}>ยกเลิก</button>
+            <button onClick={() => setDeleting(null)}><FiX aria-hidden="true"/>ยกเลิก</button>
             <button
               className="danger"
               disabled={busy}
@@ -1101,7 +1112,7 @@ function Management({ entity, user }: { entity: string; user: Row }) {
                 }
               }}
             >
-              ลบข้อมูล
+              {busy ? <FiLoader className="button-spinner" aria-hidden="true"/> : <FiTrash2 aria-hidden="true"/>}{busy ? "กำลังลบ…" : "ลบข้อมูล"}
             </button>
           </div>
         </Modal>
@@ -1358,7 +1369,7 @@ function Profile({
           )}
           <div className="actions">
             <button className="primary" disabled={busy}>
-              บันทึกข้อมูล
+              {busy ? <FiLoader className="button-spinner" aria-hidden="true"/> : <FiSave aria-hidden="true"/>}{busy ? "กำลังบันทึก…" : "บันทึกข้อมูล"}
             </button>
           </div>
         </form>
@@ -1371,21 +1382,31 @@ function Reports({ kind }: { kind: string }) {
   const [error, setError] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [busy, setBusy] = useState(false);
+  const sequence = useRef(0);
   const [filter, setFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   useEffect(() => { setPage(1); }, [filter, kind, data]);
-  const load = () => {
-    setError("");
-    return api("/reports/" + kind + "?start=" + start + "&end=" + end)
-      .then(setData)
-      .catch((e) => { setData(null); setError(e.message); });
+  const load = async (from = start, to = end) => {
+    if(from && to && from > to) { setError("วันที่สิ้นสุดต้องไม่อยู่ก่อนวันที่เริ่มต้น"); return; }
+    const request = ++sequence.current;
+    setError(""); setBusy(true);
+    try {
+      const result = await api("/reports/" + kind + "?start=" + from + "&end=" + to);
+      if(request === sequence.current) setData(result);
+    } catch(e) { if(request === sequence.current) setError((e as Error).message); }
+    finally { if(request === sequence.current) setBusy(false); }
   };
   useEffect(() => {
-    load();
+    void load();
+    return () => { sequence.current++; };
   }, [kind]);
   const rows = (data?.rows || []).filter((r: Row) =>
     r.user_query.includes(filter),
   );
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / pageSize)));
+  useEffect(() => { setPage(currentPage); }, [currentPage]);
   function download() {
     const quote = (x: any) =>
       '"' +
@@ -1438,32 +1459,18 @@ function Reports({ kind }: { kind: string }) {
           {error}
         </p>
       )}
-      <form
-        className="date-filter"
-        onSubmit={(e) => {
-          e.preventDefault();
-          load();
-        }}
-      >
-        <label>
-          ตั้งแต่วันที่
-          <input
-            type="date"
-            value={start}
-            onChange={(e) => setStart(e.target.value)}
-          />
-        </label>
-        <label>
-          ถึงวันที่
-          <input
-            type="date"
-            value={end}
-            min={start}
-            onChange={(e) => setEnd(e.target.value)}
-          />
-        </label>
-        <button className="primary">แสดงข้อมูล</button>
+      <form className="date-filter report-date-filter" aria-label="กรองรายงานตามวันที่" aria-busy={busy}
+        onSubmit={(e)=>{e.preventDefault();if(!busy) void load();}}>
+        <div className="date-filter-heading"><strong>ช่วงวันที่ของรายงาน</strong><small id="report-date-hint">เว้นว่างเพื่อดูข้อมูลทั้งหมด</small></div>
+        <div className="date-filter-controls">
+          <label>วันที่เริ่มต้น<input type="date" value={start} max={end || undefined} disabled={busy} aria-describedby="report-date-hint" onChange={e=>setStart(e.target.value)} /></label>
+          <span className="date-range-separator" aria-hidden="true">–</span>
+          <label>วันที่สิ้นสุด<input type="date" value={end} min={start || undefined} disabled={busy} aria-describedby="report-date-hint" onChange={e=>setEnd(e.target.value)} /></label>
+          <button type="submit" className="primary report-apply" disabled={busy}>{busy ? <FiLoader className="button-spinner" aria-hidden="true"/> : <FiSearch aria-hidden="true"/>}{busy?"กำลังโหลด…":"ดูรายงาน"}</button>
+          {(start || end) && <button type="button" className="report-reset" disabled={busy} onClick={()=>{setStart("");setEnd("");void load("", "");}}><FiX />ล้างวันที่</button>}
+        </div>
       </form>
+      {busy && <p className="report-loading" role="status">กำลังโหลดรายงาน…</p>}
       {data && (
         <>
           <div className="stats">
@@ -1587,7 +1594,12 @@ function Reports({ kind }: { kind: string }) {
                         configs[k] && !["curricula", "careers"].includes(k),
                     )
                     .map(([k, v]) => (
-                      <a className="summary-row" href={publicUrl("/admin/" + k)} key={k}>
+                      <a className="summary-row" href={publicUrl("/admin/" + k)}
+                onClick={(event) => {
+                  if(event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                  event.preventDefault();
+                  if(kind !== k) window.history.pushState(null, "", publicUrl("/admin/" + k));
+                }} key={k}>
                         <span>{configs[k].single}</span>
                         <strong>{String(v)}</strong>
                       </a>
@@ -1624,7 +1636,7 @@ function Reports({ kind }: { kind: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.slice((page - 1) * 30, page * 30).map((r: Row) => (
+                  {rows.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((r: Row) => (
                     <tr key={r.id}>
                       <td>
                         <details>
@@ -1651,20 +1663,10 @@ function Reports({ kind }: { kind: string }) {
                       </td>
                       <td>
                         {kind === "unanswered" ? (
-                          <button
-                            onClick={async () => {
-                              try {
-                                await api("/unanswered/" + r.id, "PATCH", {
-                                  resolved: !r.resolved,
-                                });
-                                load();
-                              } catch (e) {
-                                setError((e as Error).message);
-                              }
-                            }}
-                          >
-                            {r.resolved ? "ตรวจสอบแล้ว" : "รอตรวจสอบ"}
-                          </button>
+                          <ReviewButton resolved={Boolean(r.resolved)} onError={setError} onToggle={async () => {
+                            await api("/unanswered/" + r.id, "PATCH", { resolved: !r.resolved });
+                            await load();
+                          }} />
                         ) : r.is_helpful === null ? (
                           "—"
                         ) : r.is_helpful ? (
@@ -1679,12 +1681,8 @@ function Reports({ kind }: { kind: string }) {
               </table>
               {rows.length === 0 && <p className="empty">ยังไม่มีข้อมูล</p>}
             </div>
-            <div className="pagination">
-              <span>ทั้งหมด {rows.length} รายการ</span>
-              <button disabled={page === 1} onClick={() => setPage(page - 1)}>ก่อนหน้า</button>
-              <span>{page} / {Math.max(1, Math.ceil(rows.length / 30))}</span>
-              <button disabled={page * 30 >= rows.length} onClick={() => setPage(page + 1)}>ถัดไป</button>
-            </div>
+            <Pagination total={rows.length} page={currentPage} pageSize={pageSize}
+              onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
           </section>
         </>
       )}

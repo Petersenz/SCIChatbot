@@ -3,6 +3,7 @@ import re
 
 RESPONSE_STYLE = """
 การเรียบเรียงคำตอบ:
+- ใช้น้ำเสียงสุภาพเป็นมิตรแบบผู้ช่วยหญิง ใช้ ค่ะ หรือนะคะอย่างเป็นธรรมชาติรวม 1–2 ครั้งต่อคำตอบ ไม่ลงท้ายทุกบรรทัด ไม่ใช้ครับ ไม่เปลี่ยนข้อความอ้างตรง ชื่อเฉพาะ URL หรือตัวเลข
 - ตอบประเด็นที่ถามก่อน ใช้ภาษาไทยธรรมชาติแบบผู้ช่วยแนะแนว ไม่คัดคำบรรยายหลักสูตรยาว ๆ มาต่อกัน
 - คำถามแนะนำหรือภาพรวม: เกริ่นสั้น 1–2 ประโยค แล้วเลือกสาระสำคัญ 2–4 ประเด็นถ้าจำเป็น แต่ละประเด็นเป็นประโยคสั้น ไม่ย้ำชื่อสาขา/หลักสูตรซ้ำหลายหัวข้อ
 - คำถามเฉพาะ เช่น วัน สถานที่ ค่าเทอม หรือหน่วยกิต: ตอบตรง ๆ ไม่ต้องแจกหัวข้ออื่น ถ้าขอรายวิชา/รายการทั้งหมด ให้ตอบครบตามหลักฐาน ไม่ตัดให้เหลือ 4 รายการ
@@ -33,3 +34,36 @@ def overview_style(question):
             "ไม่ใส่ย่อหน้าปรัชญาหรือเป้าหมายผลิตบัณฑิต ไม่ต้องใส่ทุกช่องข้อมูลที่ค้นพบ "
             "ไม่เพิ่มหัวข้อที่ไม่มีข้อมูล ไม่ปิดท้ายด้วยเรื่องที่ไม่ได้ถาม "
             "รักษาปีและข้อจำกัดของข้อเท็จจริงที่เลือกมาตอบ และอ้างอิงให้ครบ")
+
+
+def polite_answer(text):
+    """Provider-independent tone on assistant prose; protect quotations/evidence."""
+    if not text or not text.strip():
+        return text
+    # Fallback evidence excerpts are verbatim: style only the status before them.
+    marker = "ข้อความจากแหล่งข้อมูลที่ค้นพบ (ยังไม่ได้สรุป):"
+    head, separator, evidence = text.partition(marker)
+    protected = r'(```[\s\S]*?```|`[^`]*`|https?://[^\s]+|“[^”]*”|"[^"\n]*")'
+    parts = re.split(protected, head)
+    count = 0
+    for index in range(0, len(parts), 2):
+        def particle(match):
+            nonlocal count
+            count += 1
+            return ("คะ" if match.string[:match.start()].endswith(("ไหม", "ไหน", "หรือไม่", "อะไร", "อย่างไร")) else "ค่ะ") if count <= 2 else ""
+        parts[index] = re.sub(r"(?:นะครับ|ครับ|นะคะ|ค่ะ|คะ)(?=[\s!?。，.,]|\[\d+\]|$)", particle, parts[index])
+    head = "".join(parts)
+    if not count:
+        lines = head.splitlines()
+        for index, line in enumerate(lines):
+            if line.strip() and not re.match(r'\s*(?:[•*#>]|https?://|```)', line) and not line.rstrip().endswith(':'):
+                # Keep citations attached and never alter numbers/URLs/quoted spans.
+                match = re.match(r"^(.*?)(\s*(?:\[\d+\]\s*)*[.!?]?)$", line)
+                lines[index] = match[1].rstrip() + "ค่ะ" + match[2]
+                break
+        else:
+            lines.insert(0, "ข้อมูลที่พบมีดังนี้ค่ะ")
+        head = "\n".join(lines)
+        if separator:
+            head = head.rstrip() + "\n\n"
+    return head + separator + evidence

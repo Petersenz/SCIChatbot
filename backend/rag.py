@@ -4,7 +4,7 @@ import httpx
 from . import generation_cache
 from .grounded_evidence import prepare_sources, exact_answer, VERSION
 from .llm_provider import identity, GroqClient
-from .response_style import RESPONSE_STYLE, format_answer, overview_style
+from .response_style import RESPONSE_STYLE, format_answer, overview_style, polite_answer
 from .text_processing import normalize_text, split_evidence
 from .query_understanding import resolve, canonical, ambiguity, topic, TERM, STUDY
 from .structured_evidence import retrieve_managed
@@ -400,6 +400,11 @@ def fallback_message(exc, source):
 
 
 def answer(db, q, history):
+    body, sources, supported, intent_id, mode = _answer(db, q, history)
+    return polite_answer(body), sources, supported, intent_id, mode
+
+
+def _answer(db, q, history):
     intents = db.scalars(
         select(MODELS["intents"]).where(MODELS["intents"].is_active == True)
     ).all()
