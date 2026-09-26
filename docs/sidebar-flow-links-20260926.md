@@ -1,0 +1,14 @@
+# Sidebar actions, original citations and FlowButton
+
+User clarified that the three-dot menu belongs to each sidebar conversation on hover. The former header-only interpretation was wrong. New row actions target that row independently of the active chat, with keyboard focus and touch visibility. Popups use a fixed portal to avoid clipping inside the scrolling history. Rename/delete/rating retain existing APIs and permissions; delete still requires confirmation.
+
+Citations, image cards and source lists prefer the official PCRU URL stored on the source record. Existing chat history is decorated on read, without rewriting stored evidence URLs or chat rows. A request-local lookup cache avoids repeated record loads for repeated citations. Safe original external links remain unchanged; records lacking an official URL retain the internal detail link. No guessed homepage or stock image replaces evidence. News39 resolves to https://sci.pcru.ac.th/news/detail/428 and curriculum24 to its official study-plan PDF.
+
+FlowButton adapts the provided arrow/circle animation to the yellow faculty palette, with standard click/disabled props and an anchor variant for staff login. Respects keyboard focus and prefers-reduced-motion. Includes idle/loading/error/success display states and a non-routed demo component. No new product menu or business feature.
+
+## Component setup
+Frontend already uses Next.js, TypeScript and Tailwind CSS v4. Components live in frontend/components; reusable primitives now live in frontend/components/ui/flow-button.tsx. Styles are frontend/app/style.css; Tailwind PostCSS is frontend/postcss.config.mjs. @/* maps to frontend/* in tsconfig. Added only lucide-react to package.json/lock; no other dependency upgrade. No provider/context hook required for FlowButton.
+
+This repository has not been initialized with the shadcn CLI. The components/ui folder and @ alias follow its convention and prevent copied UI components being mixed into page logic. If further shadcn components are wanted, run `npx shadcn@latest init` from frontend in an isolated branch and select the existing app/style.css and @ aliases; review generated global styles before integration. Tailwind and TypeScript do not need reinstalling. Current FlowButton works without shadcn runtime packages. Demo is frontend/components/ui/demo.tsx, not a public route.
+
+Validation: backend source-link/grounding/provider unit tests14passed; production build and TypeScript pass. Preview initially lacked runtime basePath, then used a disallowed development origin; resolved by setting prefix and using existing allowed localhost3100 over SSH, with no production origin-policy change. Preview renames a nonactive test conversation while preserving active conversation. Postdeploy official-link and UI checks recorded in project state. No RAG/generation/DB schema change; immutable rollback retains prior release and unchanged environment.

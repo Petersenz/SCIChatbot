@@ -1516,3 +1516,36 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
  .chat-shell .welcome { padding: 12px 20px 24px; }
  .chat-shell .disclaimer { font-size: 10px; }
 }
+
+/* FlowButton: supplied arrow/circle motion in the existing faculty palette. */
+.flow-button { position:relative; display:flex; align-items:center; justify-content:center; gap:4px; width:100%; min-height:48px; overflow:hidden; isolation:isolate; border:1.5px solid #b6a576; border-radius:100px; background:transparent; padding:12px 38px; font-size:14px; font-weight:500; color:var(--ink); cursor:pointer; text-decoration:none; transition:border-color .6s, border-radius .6s, transform .2s; }
+.flow-button .flow-label { position:relative; z-index:1; min-width:0; transform:translateX(-8px); transition:transform .8s ease-out; text-align:left; }
+.flow-label > span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.flow-button .flow-label small { display:block; color:var(--muted); font-size:11px; font-weight:400; }
+.flow-arrow, .flow-status { position:absolute; z-index:2; width:17px; height:17px; stroke:currentColor; transition:left .8s cubic-bezier(.34,1.56,.64,1),right .8s cubic-bezier(.34,1.56,.64,1); }
+.flow-arrow-in { left:-25%; }
+.flow-arrow-out,.flow-status { right:16px; }
+.flow-circle { position:absolute; z-index:0; top:50%; left:50%; width:16px; aspect-ratio:1; background:var(--yellow); border-radius:50%; opacity:0; transform:translate(-50%,-50%); transition:width .8s cubic-bezier(.19,1,.22,1),opacity .4s; pointer-events:none; }
+.chat-shell .flow-button.new-conversation { border-radius:100px; background:var(--cream); border-color:#d3b65d; padding:12px 38px; justify-content:center; }
+.chat-shell .flow-button.staff-entry { border-color:var(--border); min-height:60px; padding:10px 38px; border-radius:100px; background:var(--chat-white); }
+@media (hover:hover) { .flow-button:not(:disabled):not([aria-disabled=true]):hover { border-color:transparent; border-radius:12px; text-decoration:none; } .flow-button:not(:disabled):hover .flow-circle { width:150%; opacity:1; } .flow-button:not(:disabled):hover .flow-arrow-in { left:16px; } .flow-button:not(:disabled):hover .flow-arrow-out { right:-25%; } .flow-button:not(:disabled):hover .flow-label { transform:translateX(8px); } }
+.flow-button:focus-visible { outline:2px solid #806000; outline-offset:3px; }
+.flow-button:active:not(:disabled) { transform:scale(.97); }
+.flow-button:disabled,.flow-button[aria-disabled=true] { opacity:.5; cursor:not-allowed; }
+.flow-button[data-state=error] { border-color:#bc2543; }
+.flow-button[data-state=success] { border-color:#247350; }
+.flow-spinner { animation:flow-spin 1s linear infinite; }
+@keyframes flow-spin { to {transform:rotate(360deg);} }
+.history-row { position:relative; display:flex; align-items:center; border-radius:10px; margin-bottom:3px; min-width:0; }
+.history-row:hover,.history-row:focus-within { background:var(--chat-hover); }
+.history-row.selected { background:var(--cream); box-shadow:inset 3px 0 var(--yellow); }
+.chat-shell .history-row .history { min-width:0; flex:1; width:calc(100% - 38px); padding-right:4px; margin:0; background:transparent; box-shadow:none; }
+.history-row .conversation-actions { flex-shrink:0; margin:0 3px 0 0; }
+.history-row .conversation-actions > button { width:34px; min-height:36px; opacity:0; transition:opacity .15s,background .15s; }
+.history-row:hover .conversation-actions > button,.history-row:focus-within .conversation-actions > button,.history-row .conversation-actions > button[aria-expanded=true] { opacity:1; }
+.sidebar-conversation-menu { position:fixed; right:auto; z-index:100; margin:0; }
+.sidebar-conversation-menu button { min-height:44px; }
+@media (hover:none),(max-width:768px) { .history-row .conversation-actions > button { opacity:1; min-width:44px; min-height:44px; } }
+@media (prefers-reduced-motion:reduce) { .flow-button,.flow-button *, .history-row .conversation-actions > button { transition:none !important; animation:none !important; } .flow-button:active:not(:disabled) { transform:none; } }
+
+.sidebar-conversation-menu { --chat-white:#fff; --chat-hover:#f3f2ef; --chat-shadow:rgba(28,28,30,.12); --chat-danger:#b42337; }

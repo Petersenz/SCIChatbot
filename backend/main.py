@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from .db import *
 from .security import hash_password, verify_password, digest
 from .rag import answer, index_document, embed
+from .source_links import decorate_sources
 from .text_processing import inspect_pdf, PDFValidationError, MAX_PDF_BYTES
 
 
@@ -585,11 +586,18 @@ def new_conversation(req: Request, db=Depends(db_session)):
     return serialize(row)
 
 
+def serialize_chat(row, db, cache=None):
+    result = serialize(row)
+    result['sources'] = decorate_sources(db, result.get('sources'), cache)
+    return result
+
+
 @app.get("/api/conversations/{id}")
 def history(id: str, req: Request, db=Depends(db_session)):
     own_conversation(id, req, db)
+    cache = {}
     return [
-        serialize(x)
+        serialize_chat(x, db, cache)
         for x in db.scalars(select(Chat).where(Chat.session_id == id).order_by(Chat.id))
     ]
 
@@ -650,7 +658,7 @@ def chat(id: str, body: Question, req: Request, db=Depends(db_session)):
     if not history:
         row.title = q[:70]
     db.commit()
-    return serialize(item)
+    return serialize_chat(item, db)
 
 
 @app.patch("/api/messages/{id}/feedback")
@@ -663,7 +671,7 @@ def feedback(id: int, body: dict, req: Request, db=Depends(db_session)):
         raise HTTPException(422)
     row.is_helpful = body.get("is_helpful")
     db.commit()
-    return serialize(row)
+    return serialize_chat(row, db)
 
 
 @app.get("/api/reports/{kind}")

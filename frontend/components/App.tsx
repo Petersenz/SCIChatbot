@@ -1,4 +1,6 @@
 "use client";
+import { createPortal } from "react-dom";
+import { FlowButton } from "@/components/ui/flow-button";
 import { useEffect, useState, useRef, FormEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -323,7 +325,7 @@ function AnswerText({ text, sources }: { text: string; sources: Row[] }) {
   const render = (value: string) => value.split(/(\[\d+\])/g).map((part, index) => {
     const match = /^\[(\d+)\]$/.exec(part);
     const source = match && sources[Number(match[1]) - 1];
-    const href = source && sourceHref(source.url || "");
+    const href = source && sourceHref(source.external_url || source.url || "");
     if (!href) return part;
     const label = source.title || "แหล่งข้อมูล";
     return <a key={index} className="citation-chip" href={href} target="_blank" rel="noopener noreferrer" title={label} aria-label={"เปิดแหล่งข้อมูล: " + label}><FiFileText /><span>{label}</span><FiExternalLink /></a>;
@@ -336,32 +338,37 @@ function AnswerText({ text, sources }: { text: string; sources: Row[] }) {
     })}</div>;
   })}</div>;
 }
-function ConversationActions({busy, onAction}: {busy: boolean; onAction: (action: "rename" | "rate" | "delete") => void}) {
+function ConversationActions({busy, title, onAction}: {busy: boolean; title: string; onAction: (action: "rename" | "rate" | "delete") => void}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const popup = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({top:0,left:0});
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
-    ref.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-    const outside = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    popup.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    const outside = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node) && !popup.current?.contains(e.target as Node)) setOpen(false); };
     document.addEventListener("pointerdown", outside);
-    return () => document.removeEventListener("pointerdown", outside);
+    const close = () => setOpen(false);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return () => { document.removeEventListener("pointerdown", outside); window.removeEventListener("resize",close); window.removeEventListener("scroll",close,true); };
   }, [open]);
   return <div className="conversation-actions" ref={ref} onKeyDown={e => {
-    if (e.key === "Escape") { setOpen(false); trigger.current?.focus(); }
+    if (e.key === "Escape") { e.stopPropagation(); setOpen(false); trigger.current?.focus(); }
     if (e.key === "Tab") setOpen(false);
     if (open && ["ArrowDown","ArrowUp","Home","End"].includes(e.key)) {
       e.preventDefault();
-      const items = Array.from(ref.current!.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+      const items = Array.from(popup.current!.querySelectorAll<HTMLElement>('[role="menuitem"]'));
       const index = items.indexOf(document.activeElement as HTMLElement);
       items[e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : (index + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
     }
   }}>
-    <button ref={trigger} className="icon" aria-label="ตัวเลือกบทสนทนา" aria-haspopup="menu" aria-expanded={open} disabled={busy} onClick={() => setOpen(!open)}><FiMoreHorizontal /></button>
-    {open && <div className="conversation-menu" role="menu" aria-label="จัดการบทสนทนา">
+    <button ref={trigger} className="icon" aria-label={"ตัวเลือกบทสนทนา: " + title} aria-haspopup="menu" aria-expanded={open} disabled={busy} onClick={() => { const rect=trigger.current!.getBoundingClientRect(); setPosition({left: Math.max(8,Math.min(rect.right-225,window.innerWidth-233)),top:Math.max(8,Math.min(rect.bottom+6,window.innerHeight-164))}); setOpen(!open); }}><FiMoreHorizontal /></button>
+    {open && createPortal(<div ref={popup} className="conversation-menu sidebar-conversation-menu" style={position} role="menu" aria-label={"จัดการบทสนทนา: " + title}>
       {([["rename","เปลี่ยนชื่อ",FiEdit2],["rate","ประเมินบทสนทนา",FiStar],["delete","ลบบทสนทนา",FiTrash2]] as const).map(([action,label,Icon]) =>
         <button key={action} role="menuitem" className={action === "delete" ? "delete-action" : ""} onClick={() => { setOpen(false); trigger.current?.focus(); onAction(action); }}><Icon />{label}</button>)}
-    </div>}
+    </div>, document.body)}
   </div>;
 }
 
@@ -392,6 +399,8 @@ function ChatApp() {
     return () => document.removeEventListener("keydown", close);
   }, [menu]);
   const [modal, setModal] = useState<"rename" | "delete" | "rate" | null>(null);
+  const [actionSession, setActionSession] = useState<Row | null>(null);
+  useEffect(() => { if (!modal) setActionSession(null); }, [modal]);
   const [dismissed, setDismissed] = useState<string[]>([]);
   const end = useRef<HTMLDivElement>(null);
   const composerInput = useRef<HTMLTextAreaElement>(null);
@@ -403,6 +412,7 @@ function ChatApp() {
     }
   }, [input]);
   const current = sessions.find((s) => s.id === active);
+  const modalSession = actionSession || current;
   useEffect(() => {
     api("/conversations")
       .then(setSessions)
@@ -470,7 +480,7 @@ function ChatApp() {
   }
   async function rate(n: number) {
     try {
-      await api("/conversations/" + active, "PATCH", { rating: n });
+      await api("/conversations/" + modalSession?.id, "PATCH", { rating: n });
       await refresh();
       setModal(null);
     } catch (e) {
@@ -497,7 +507,8 @@ function ChatApp() {
           <a className="brand" href={publicUrl("/")}><Mark /><strong>ไซน์แชทบอท</strong></a>
           <button className="icon mobile-toggle" aria-label="ปิดเมนู" onClick={() => { setMenu(false); sideToggle.current?.focus(); }}><FiX /></button>
         </div>
-        <button
+        <FlowButton
+          text="เริ่มสนทนาใหม่"
           className="new-conversation"
           disabled={busy}
           onClick={() => {
@@ -510,17 +521,15 @@ function ChatApp() {
               setModal("rate");
             else reset();
           }}
-        >
-          <FiEdit /> เริ่มสนทนาใหม่
-        </button>
+        />
         <p className="side-label">ประวัติการสนทนา</p>
         <nav aria-label="ประวัติการสนทนา">
           {sessions.length === 0 ? (
             <p className="muted empty-history">ยังไม่มีประวัติการสนทนา</p>
           ) : (
             sessions.map((s) => (
+              <div key={s.id} className={"history-row " + (s.id === active ? "selected" : "")}>
               <button
-                key={s.id}
                 onClick={() => select(s)}
                 disabled={busy}
                 aria-current={s.id === active ? "page" : undefined}
@@ -529,14 +538,13 @@ function ChatApp() {
                 <FiMessageSquare />
                 <span title={s.title}>{s.title}</span>
               </button>
+              <ConversationActions busy={busy} title={s.title} onAction={action => {setActionSession(s); setModal(action);}} />
+              </div>
             ))
           )}
         </nav>
         <div className="chat-side-footer">
-          <a className="staff-entry" href={publicUrl(staff ? (staff.role === "admin" ? "/admin/dashboard" : "/admin/curricula") : "/login")}>
-            <span className="staff-icon"><FiUser /></span>
-            <span><strong>{staff ? staff.fullname : "เข้าสู่ระบบ"}</strong><small>{staff ? "จัดการระบบ" : "(สำหรับเจ้าหน้าที่)"}</small></span>
-          </a>
+          <FlowButton className="staff-entry" text={staff ? staff.fullname : "เข้าสู่ระบบ"} subtitle={staff ? "จัดการระบบ" : "(สำหรับเจ้าหน้าที่)"} href={publicUrl(staff ? (staff.role === "admin" ? "/admin/dashboard" : "/admin/curricula") : "/login")} />
           <small className="version">SCI Chatbot v1.0</small>
         </div>
       </aside>
@@ -544,7 +552,7 @@ function ChatApp() {
         <div className="conversation-bar">
           <button ref={sideToggle} className="icon mobile-toggle" aria-label="เปิดประวัติการสนทนา" aria-controls="chat-sidebar" aria-expanded={menu} onClick={() => setMenu(true)}><FiMenu /></button>
           <span className="conversation-title">{active ? current?.title || "บทสนทนาใหม่" : ""}</span>
-          {active && <ConversationActions busy={busy} onAction={setModal} />}
+
         </div>
         <div className="chat-scroll">
           {messages.length === 0 ? (
@@ -584,7 +592,7 @@ function ChatApp() {
                       <div className="bot-content">
                         <AnswerText text={m.bot_response} sources={m.sources || []} />
                         {m.sources?.filter((s: Row) => s.image_url).map((s: Row) => (
-                          <a className="answer-image" key={s.url} href={publicUrl(s.url)} target="_blank" rel="noopener noreferrer">
+                          <a className="answer-image" key={s.url} href={sourceHref(s.external_url || s.url || "")} target="_blank" rel="noopener noreferrer">
                             {/* Existing source image, never a model-generated URL. */}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={publicUrl(s.image_url)} alt={s.title} loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
@@ -596,7 +604,7 @@ function ChatApp() {
                             <summary><FiBookOpen /> แหล่งข้อมูล · {m.sources.length}</summary>
                             {m.sources.map((s: Row, i: number) => (
                               <a
-                                href={publicUrl(s.url)}
+                                href={sourceHref(s.external_url || s.url || "")}
                                 key={s.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -711,7 +719,7 @@ function ChatApp() {
               e.preventDefault();
               try {
                 await api(
-                  "/conversations/" + active,
+                  "/conversations/" + modalSession?.id,
                   "PATCH",
                   Object.fromEntries(new FormData(e.currentTarget)),
                 );
@@ -728,7 +736,7 @@ function ChatApp() {
                 name="title"
                 required
                 maxLength={120}
-                defaultValue={current?.title}
+                defaultValue={modalSession?.title}
               />
             </label>
             <div className="actions">
@@ -742,16 +750,16 @@ function ChatApp() {
       )}
       {modal === "delete" && (
         <Modal title="ลบบทสนทนา" close={() => setModal(null)}>
-          <p>ต้องการลบบทสนทนานี้หรือไม่?</p>
+          <p>ต้องการลบบทสนทนา “{modalSession?.title}” หรือไม่?</p>
           <div className="actions">
             <button onClick={() => setModal(null)}>ยกเลิก</button>
             <button
               className="danger"
               onClick={async () => {
                 try {
-                  await api("/conversations/" + active, "DELETE");
+                  await api("/conversations/" + modalSession?.id, "DELETE");
                   setModal(null);
-                  reset();
+                  if (modalSession?.id === active) reset();
                   await refresh();
                 } catch (e) {
                   setError((e as Error).message);
@@ -771,7 +779,7 @@ function ChatApp() {
               <button
                 key={n}
                 aria-label={n + " ดาว"}
-                aria-pressed={current?.rating === n}
+                aria-pressed={modalSession?.rating === n}
                 onClick={() => rate(n)}
               >
                 <FiStar />
