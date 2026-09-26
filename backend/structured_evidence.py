@@ -56,6 +56,17 @@ def named_news(q, rows):
 
 def retrieve_managed(db, q, majors, curricula, plan=None):
     """None delegates to semantic search; [] means this route has no evidence."""
+    if plan and plan.general_scope_resolved and not plan.entities:
+        # An empty scoped catalog lookup is not permission to search another
+        # major's documents. Contact fields may also live on the major itself.
+        if plan.route == 'contact' and plan.major_names:
+            return [source(m.major_name_th, f'/records/majors/{m.id}',
+                           '\n'.join(f'{field}: {getattr(m, field)}' for field in
+                                     ('major_name_th', 'tel', 'email', 'website_url', 'facebook_page')
+                                     if getattr(m, field, None)))
+                    for m in majors if m.major_name_th in plan.major_names and
+                    any(getattr(m, field, None) for field in ('tel', 'email', 'website_url', 'facebook_page'))]
+        return []
     # A resolved entity is read by identity, not rediscovered by similarity.
     if plan and plan.entities and all(e.table in ('news', 'general') for e in plan.entities):
         selected = []

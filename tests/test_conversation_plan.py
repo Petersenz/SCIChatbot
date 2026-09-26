@@ -117,3 +117,36 @@ def test_event_year_changes_do_not_mix_prior_year(catalog):
     result = plan(catalog, 'แล้วปี 2572 จัดวันไหน', ['Future Lab 2571 คืออะไร'])
     assert [e.id for e in result.entities] == [22]
     assert '2571' not in result.query and '2572' in result.query
+
+
+def test_faculty_wide_question_discards_previous_major(catalog):
+    result = plan(catalog, 'คณะมีทุนอะไรบ้าง', ['วิทย์คอมมีทุนไหม'])
+    assert not result.major_names and not result.entities
+    assert 'วิทยาการคอมพิวเตอร์' not in result.query
+    assert result.general_scope_resolved
+    from backend.structured_evidence import retrieve_managed
+    assert retrieve_managed(None, result.query, catalog.majors, [], plan=result) == []
+
+
+@pytest.mark.parametrize('question', ['วิทย์คอมมีอาชีพอะไรบ้าง', 'วิทย์คอมจบไปทำอาชีพอะไรได้บ้าง', 'วิทย์คอมมีงานอะไรบ้าง'])
+def test_broad_career_question_clears_previous_job(catalog, question):
+    result = plan(catalog, question, ['วิทย์คอมจบไปทำเว็บได้ไหม'])
+    assert result.major_names == ('วิทยาการคอมพิวเตอร์',)
+    assert not result.entities and 'นักพัฒนาเว็บ' not in result.query
+
+
+def test_cross_domain_fields_do_not_silently_answer_only_one(catalog):
+    result = plan(catalog, 'วิทย์คอม ค่าเทอมเท่าไหร่ แล้วจบไปเงินเดือนเท่าไหร่')
+    assert result.clarification and set(result.requested_fields) == {'salary_start', 'tuition_fee'}
+
+
+def test_admissions_news_is_not_empty_general_catalog(catalog):
+    result = plan(catalog, 'ข่าวรับสมัครล่าสุด')
+    assert result.route == 'news' and not result.general_scope_resolved
+
+
+def test_contact_without_contact_fields_is_not_evidence(catalog):
+    from backend.structured_evidence import retrieve_managed
+    result = plan(catalog, 'วิทย์คอมติดต่อที่ไหน')
+    assert result.general_scope_resolved
+    assert retrieve_managed(None, result.query, catalog.majors, [], plan=result) == []

@@ -1,7 +1,7 @@
 """Conservative question normalization within the faculty-advising scope."""
 import re
 from .text_processing import normalize_text
-from .career_scope import career_names
+from .career_scope import career_names, broad_career_question
 
 YEAR = r'(?<!\d)(25\d{2})(?!\d)'
 STUDY = r'ปี\s*(?:ที่\s*)?([1-6])(?!\d)'
@@ -80,7 +80,7 @@ def resolve(q, history, majors, career_titles=()):
         general = general_topic(current)
         broad = any(x in current for x in ['ทั้งคณะ', 'ของคณะ', 'มหาวิทยาลัย', 'ทุกสาขา'])
         switched = bool(named and {m.id for m in named} != {m.id for m in old_named})
-        if switched or broad or topic(current) != 'career' or any(x in current for x in ['อาชีพทั้งหมด', 'อาชีพอะไรบ้าง', 'งานอะไรบ้าง', 'อาชีพอื่น', 'ทุกอาชีพ', 'ทุกงาน']):
+        if switched or broad or topic(current) != 'career' or broad_career_question(current):
             focus = []
         if explicit_focus:
             focus = explicit_focus

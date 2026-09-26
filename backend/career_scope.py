@@ -33,6 +33,10 @@ def career_names(question, titles):
     return [title for title in titles if any(needle in title.lower() for needle in needles)]
 
 
+def broad_career_question(q):
+    return any(x in q for x in ("อาชีพทั้งหมด", "อาชีพอะไรบ้าง", "อาชีพอะไรได้บ้าง", "งานอะไรบ้าง", "อาชีพอื่น", "ทุกอาชีพ", "ทุกงาน"))
+
+
 def salary_question(q):
     return any(w in q for w in ('เงินเดือน', 'รายได้', 'ค่าตอบแทน'))
 

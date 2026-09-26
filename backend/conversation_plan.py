@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from sqlalchemy import select
 from .db import MODELS
 from .query_understanding import canonical, resolve, topic, general_topic, YEAR, STUDY, TERM
-from .career_scope import career_names
+from .career_scope import career_names, broad_career_question
 
 PUBLIC_TABLES = ('majors', 'curricula', 'careers', 'general', 'news')
 TITLE_FIELDS = dict(majors='major_name_th', curricula='degree_name', careers='job_title', general='topic', news='title')
@@ -76,6 +76,7 @@ class QueryPlan:
     term: str | None = None
     requested_fields: tuple = ()
     intent_candidates: tuple = field(default=(), repr=False)
+    general_scope_resolved: bool = False
 
 
 class PlannedQuery(str):
@@ -112,6 +113,8 @@ class Catalog:
 def detect_route(q):
     for spec in TOPICS:
         if any(cue in q.lower() for cue in spec.cues):
+            if spec.key == 'admissions' and any(cue in q for cue in ('ข่าว', 'ประกาศ')):
+                return 'news'
             return spec.key
     return None
 
@@ -215,7 +218,7 @@ def make_plan(q, history, catalog):
                     current += ' ' + names[0]
             else:
                 entities = old.entities
-        if route == 'career' and any(x in current for x in ('ทุกอาชีพ', 'อาชีพทั้งหมด', 'งานอะไรบ้าง', 'อาชีพอื่น')):
+        if route == 'career' and broad_career_question(current):
             entities = ()
         arithmetic = bool(re.search(r'\d+\s*[+*/=]\s*\d+', current))
         clarification = 'คำถามนี้อยู่นอกข้อมูลแนะแนวของคณะ กรุณาสอบถามเรื่องคณะ หลักสูตร อาชีพ หรือการสมัครค่ะ' if arithmetic else 'ต้องการสอบถามข้อมูลด้านใดของคณะหรือสาขาวิชาคะ' if route is None and not explicit and not named and not ACK.fullmatch(current) else None
@@ -228,7 +231,8 @@ def make_plan(q, history, catalog):
                 entities = (choices[n-1],)
             else:
                 clarification = 'กรุณาระบุชื่อรายการที่ต้องการสอบถาม เพื่อให้เลือกข้อมูลได้ตรงค่ะ'
-        if not entities and 'general' in tables and route not in ('curriculum', 'news'):
+        general_scope_resolved = not entities and 'general' in tables and route not in ('curriculum', 'news')
+        if general_scope_resolved:
             scope_names = named or (() if broad else old.major_names if old else ())
             candidates = [e for e in catalog.entities if e.table == 'general' and detect_route(canonical(e.title)) == route]
             if scope_names:
@@ -236,7 +240,7 @@ def make_plan(q, history, catalog):
             else:
                 candidates = [e for e in candidates if not any(m.major_name_th in canonical(e.title) for m in catalog.majors)]
             entities = tuple(candidates)
-        prior = [SimpleNamespace(user_query=old.query)] if old else []
+        prior = [SimpleNamespace(user_query=old.query)] if old and not broad else []
         expanded = resolve(current, prior, catalog.majors, catalog.career_titles)
         if broad:
             names = named
@@ -270,10 +274,13 @@ def make_plan(q, history, catalog):
             clarification = 'หมายถึงรายการไหนคะ: ' + ' หรือ '.join(e.title for e in entities[:5])
         plan = QueryPlan(q, expanded, route, entities, names, tables, clarification,
                          'return' if returning else 'continue' if compatible else 'switch' if active else 'new')
+        plan.general_scope_resolved = general_scope_resolved
         plan.year = (re.search(YEAR, expanded).group(1) if re.search(YEAR, expanded) else None)
         plan.study_year = (re.search(STUDY, expanded).group(1) if re.search(STUDY, expanded) else None)
         plan.term = (re.search(TERM, expanded).group(1) if re.search(TERM, expanded) else None)
         plan.requested_fields = tuple(field for field, words in FIELD_CUES.items() if any(w in current for w in words))
+        if set(plan.requested_fields) & {'salary_start', 'skill_required'} and set(plan.requested_fields) & {'tuition_fee', 'total_credits'}:
+            plan.clarification = 'คำถามมีทั้งข้อมูลหลักสูตรและข้อมูลอาชีพ ต้องการทราบเรื่องหลักสูตรหรืออาชีพก่อนคะ'
         active = plan
         if route:
             frames[route] = plan

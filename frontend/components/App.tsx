@@ -1,4 +1,6 @@
 "use client";
+import {TableControls, SortHeading} from "@/components/ui/table-controls";
+import {managementColumns, reportColumns, queryRows, type Filters, type Sort} from "@/components/ui/table-query";
 import { ReviewButton } from "@/components/ui/review-button";
 import { Pagination } from "@/components/ui/pagination";
 import { createPortal } from "react-dom";
@@ -96,7 +98,7 @@ function Modal({
     };
   }, []);
   return (
-    <dialog ref={ref} onCancel={close} aria-labelledby="dialog-title" onKeyDown={(event) => {
+    <dialog ref={ref} onCancel={event => { event.preventDefault(); close(); }} aria-labelledby="dialog-title" onKeyDown={(event) => {
       if (event.key !== 'Tab') return;
       const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
         'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex="0"]'
@@ -480,6 +482,9 @@ function ChatApp() {
     return () => document.removeEventListener("keydown", close);
   }, [menu]);
   const [modal, setModal] = useState<"rename" | "delete" | "rate" | null>(null);
+  const [modalError, setModalError] = useState("");
+  const [modalBusy, setModalBusy] = useState(false);
+  useEffect(() => { setModalError(""); }, [modal]);
   const [actionSession, setActionSession] = useState<Row | null>(null);
   useEffect(() => { if (!modal) setActionSession(null); }, [modal]);
   const [dismissed, setDismissed] = useState<string[]>([]);
@@ -500,7 +505,8 @@ function ChatApp() {
       .catch((e) => setError(e.message));
   }, []);
   useEffect(() => {
-    end.current?.scrollIntoView({ behavior: "smooth" });
+    const viewport = end.current?.closest<HTMLElement>(".chat-scroll");
+    viewport?.scrollTo({ top: viewport.scrollHeight, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [messages, busy]);
   async function refresh() {
     setSessions(await api("/conversations"));
@@ -785,61 +791,45 @@ function ChatApp() {
         </div>
       </main>
       {modal === "rename" && (
-        <Modal title="แก้ไขชื่อการสนทนา" close={() => setModal(null)}>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              try {
-                await api(
-                  "/conversations/" + modalSession?.id,
-                  "PATCH",
-                  Object.fromEntries(new FormData(e.currentTarget)),
-                );
-                await refresh();
-                setModal(null);
-              } catch (e) {
-                setError((e as Error).message);
-              }
-            }}
-          >
-            <label>
-              ชื่อการสนทนา
-              <input
-                name="title"
-                required
-                maxLength={120}
-                defaultValue={modalSession?.title}
-              />
-            </label>
+        <Modal title="แก้ไขชื่อการสนทนา" close={() => {if (!modalBusy) setModal(null);}}>
+          <form onSubmit={async e => {
+            e.preventDefault(); if (modalBusy) return;
+            setModalBusy(true); setModalError("");
+            try {
+              const saved = await api("/conversations/" + modalSession?.id, "PATCH", Object.fromEntries(new FormData(e.currentTarget)));
+              setSessions(old => old.map(item => item.id === modalSession?.id ? {...item, title:saved.title} : item));
+              setModal(null);
+              try { await refresh(); } catch { setError("บันทึกชื่อแล้ว แต่โหลดรายการไม่สำเร็จ กรุณาโหลดหน้าใหม่ ไม่ต้องบันทึกซ้ำ"); }
+            } catch (error) { setModalError((error as Error).message); }
+            finally { setModalBusy(false); }
+          }}>
+            <label>ชื่อการสนทนา<input name="title" required maxLength={120} defaultValue={modalSession?.title} disabled={modalBusy}/></label>
+            {modalError && <p role="alert" className="alert">{modalError}</p>}
             <div className="actions">
-              <button type="button" onClick={() => setModal(null)}>
-                <FiX aria-hidden="true"/>ยกเลิก
-              </button>
-              <button className="primary"><FiSave aria-hidden="true"/>บันทึก</button>
+              <button type="button" disabled={modalBusy} onClick={() => setModal(null)}><FiX aria-hidden="true"/>ยกเลิก</button>
+              <button className="primary" disabled={modalBusy}>{modalBusy ? <FiLoader className="button-spinner" aria-hidden="true"/> : <FiSave aria-hidden="true"/>}{modalBusy ? "กำลังบันทึก…" : "บันทึก"}</button>
             </div>
           </form>
         </Modal>
       )}
       {modal === "delete" && (
-        <Modal title="ลบบทสนทนา" close={() => setModal(null)}>
+        <Modal title="ลบบทสนทนา" close={() => {if (!modalBusy) setModal(null);}}>
           <p>ต้องการลบบทสนทนา “{modalSession?.title}” หรือไม่?</p>
+          {modalError && <p role="alert" className="alert">{modalError}</p>}
           <div className="actions">
-            <button onClick={() => setModal(null)}><FiX aria-hidden="true"/>ยกเลิก</button>
-            <button
-              className="danger"
-              onClick={async () => {
-                try {
-                  await api("/conversations/" + modalSession?.id, "DELETE");
-                  setModal(null);
-                  if (modalSession?.id === active) reset();
-                  await refresh();
-                } catch (e) {
-                  setError((e as Error).message);
-                }
-              }}
-            >
-              <FiTrash2 aria-hidden="true"/>ลบบทสนทนา
-            </button>
+            <button disabled={modalBusy} onClick={() => setModal(null)}><FiX aria-hidden="true"/>ยกเลิก</button>
+            <button className="danger" disabled={modalBusy} onClick={async () => {
+              if (modalBusy) return;
+              setModalBusy(true); setModalError("");
+              try {
+                await api("/conversations/" + modalSession?.id, "DELETE");
+                setSessions(old => old.filter(item => item.id !== modalSession?.id));
+                setModal(null);
+                if (modalSession?.id === active) reset();
+                try { await refresh(); } catch { setError("ลบบทสนทนาแล้ว แต่โหลดรายการไม่สำเร็จ กรุณาโหลดหน้าใหม่ ไม่ต้องลบซ้ำ"); }
+              } catch (error) { setModalError((error as Error).message); }
+              finally { setModalBusy(false); }
+            }}>{modalBusy ? <FiLoader className="button-spinner" aria-hidden="true"/> : <FiTrash2 aria-hidden="true"/>}{modalBusy ? "กำลังลบ…" : "ลบบทสนทนา"}</button>
           </div>
         </Modal>
       )}
@@ -859,8 +849,23 @@ function Management({ entity, user }: { entity: string; user: Row }) {
   const cfg = configs[entity];
   const [rows, setRows] = useState<Row[]>([]);
   const [lookups, setLookups] = useState<Row>({ majors: [], careers: [] });
-  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<Filters>({});
+  const [sort, setSort] = useState<Sort>(null);
   const [editing, setEditing] = useState<Row | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [discardRequested, setDiscardRequested] = useState(false);
+  const keepEditing = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (discardRequested) keepEditing.current?.focus(); }, [discardRequested]);
+  const editingForm = useRef<HTMLFormElement>(null);
+  function closeEditing() {
+    if (busy) return;
+    if (editingForm.current?.querySelector('[data-uploading="true"]')) {
+      setError("กรุณารอให้อัปโหลดไฟล์เสร็จก่อนปิดแบบฟอร์ม");
+      return;
+    }
+    if (dirty) { setDiscardRequested(true); return; }
+    setEditing(null); setDirty(false); setDiscardRequested(false);
+  }
   const [deleting, setDeleting] = useState<Row | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -873,9 +878,8 @@ function Management({ entity, user }: { entity: string; user: Row }) {
       setError(e.message),
     );
   }, [entity]);
-  const filtered = rows.filter((r) =>
-    JSON.stringify(r).toLowerCase().includes(search.toLowerCase()),
-  );
+  const columns = managementColumns(cfg, lookups);
+  const filtered = queryRows(rows, columns, filters, sort);
   const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
   useEffect(() => { setPage(currentPage); }, [currentPage]);
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -897,6 +901,7 @@ function Management({ entity, user }: { entity: string; user: Row }) {
         .find((f) => f.key === k)
         ?.options?.find((o) => o[0] === v)?.[1];
     if (k === "created_at") return new Date(v).toLocaleDateString("th-TH");
+    if (k === "curriculum_year") return String(v);
     if (typeof v === "number") return v.toLocaleString("th-TH");
     return String(v);
   }
@@ -927,7 +932,7 @@ function Management({ entity, user }: { entity: string; user: Row }) {
         editing?.id ? "PUT" : "POST",
         data,
       );
-      setEditing(null);
+      setEditing(null); setDirty(false); setDiscardRequested(false);
       setNotice(["บันทึกข้อมูลแล้ว", ...(saved.ingestion_warnings || [])].join(" — "));
       try {await load();} catch {setError("บันทึกข้อมูลแล้ว แต่โหลดรายการไม่สำเร็จ กรุณาโหลดหน้านี้ใหม่ ไม่ต้องบันทึกซ้ำ");}
     } catch (e) {
@@ -947,6 +952,7 @@ function Management({ entity, user }: { entity: string; user: Row }) {
           className="primary"
           onClick={() => {
             setError("");
+            setDirty(false);
             setEditing({
               active: true,
               is_active: true,
@@ -970,33 +976,12 @@ function Management({ entity, user }: { entity: string; user: Row }) {
         </p>
       )}
       <section className="panel">
-        <div className="table-toolbar">
-          <h2>
-            {cfg.single}ทั้งหมด <span className="count">{rows.length}</span>
-          </h2>
-          <div className="search">
-            <FiSearch />
-            <input
-              aria-label={"ค้นหา" + cfg.single}
-              placeholder="ค้นหา…"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-            />
-          </div>
-        </div>
+        <TableControls title={<>{cfg.single}ทั้งหมด <span className="count">{rows.length}</span></>} columns={columns} rows={rows} filters={filters} resultCount={filtered.length} onChange={next=>{setFilters(next);setPage(1);}} />
         <div className="table-scroll">
           <table>
             <thead>
               <tr>
-                {cfg.columns.map((k) => (
-                  <th key={k}>
-                    {cfg.fields.find((f) => f.key === k)?.label ||
-                      "วันที่เพิ่ม"}
-                  </th>
-                ))}
+                {columns.map(column => <SortHeading key={column.key} column={column} sort={sort} onChange={next=>{setSort(next);setPage(1);}} />)}
                 <th>จัดการ</th>
               </tr>
             </thead>
@@ -1017,6 +1002,7 @@ function Management({ entity, user }: { entity: string; user: Row }) {
                         aria-label={"แก้ไข " + display(r, cfg.columns[0])}
                         onClick={() => {
                           setError("");
+                          setDirty(false);
                           setEditing(r);
                         }}
                       >
@@ -1043,11 +1029,16 @@ function Management({ entity, user }: { entity: string; user: Row }) {
       {editing && (
         <Modal
           title={(editing.id ? "แก้ไข" : "เพิ่ม") + cfg.single}
-          close={() => {
-            if (!busy) setEditing(null);
-          }}
+          close={closeEditing}
         >
-          <form onSubmit={save}>
+          <form ref={editingForm} onChange={() => setDirty(true)} onSubmit={save}>
+            {discardRequested && <div className="notice" role="alert">
+              <p>มีข้อมูลที่ยังไม่ได้บันทึก ต้องการละทิ้งการแก้ไขหรือไม่?</p>
+              <div className="actions">
+                <button ref={keepEditing} type="button" onClick={() => { setDiscardRequested(false); editingForm.current?.querySelector<HTMLInputElement>("input,textarea,select")?.focus(); }}><FiEdit2 aria-hidden="true"/>กลับไปแก้ไข</button>
+                <button type="button" className="danger" onClick={() => {setEditing(null);setDirty(false);setDiscardRequested(false);}}><FiX aria-hidden="true"/>ละทิ้งการแก้ไข</button>
+              </div>
+            </div>}
             <div className="form-grid">
               {cfg.fields.map((f) => (
                 <FieldInput
@@ -1078,7 +1069,7 @@ function Management({ entity, user }: { entity: string; user: Row }) {
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => setEditing(null)}
+                onClick={closeEditing}
               >
                 <FiX aria-hidden="true"/>ยกเลิก
               </button>
@@ -1090,10 +1081,10 @@ function Management({ entity, user }: { entity: string; user: Row }) {
         </Modal>
       )}
       {deleting && (
-        <Modal title={"ลบ" + cfg.single} close={() => setDeleting(null)}>
+        <Modal title={"ลบ" + cfg.single} close={() => {if (!busy) setDeleting(null);}}>
           <p>ต้องการลบ “{display(deleting, cfg.columns[0])}” หรือไม่?</p>
           <div className="actions">
-            <button onClick={() => setDeleting(null)}><FiX aria-hidden="true"/>ยกเลิก</button>
+            <button disabled={busy} onClick={() => setDeleting(null)}><FiX aria-hidden="true"/>ยกเลิก</button>
             <button
               className="danger"
               disabled={busy}
@@ -1102,8 +1093,8 @@ function Management({ entity, user }: { entity: string; user: Row }) {
                 try {
                   await api("/manage/" + entity + "/" + deleting.id, "DELETE");
                   setDeleting(null);
-                  await load();
                   setNotice("ลบข้อมูลแล้ว");
+                  try { await load(); } catch { setError("ลบข้อมูลแล้ว แต่โหลดรายการไม่สำเร็จ กรุณาโหลดหน้าใหม่ ไม่ต้องลบซ้ำ"); }
                 } catch (e) {
                   setError((e as Error).message);
                   setDeleting(null);
@@ -1384,10 +1375,11 @@ function Reports({ kind }: { kind: string }) {
   const [end, setEnd] = useState("");
   const [busy, setBusy] = useState(false);
   const sequence = useRef(0);
-  const [filter, setFilter] = useState("");
+  const [filters, setFilters] = useState<Filters>({});
+  const [sort, setSort] = useState<Sort>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  useEffect(() => { setPage(1); }, [filter, kind, data]);
+  useEffect(() => { setPage(1); }, [filters, sort, kind, data]);
   const load = async (from = start, to = end) => {
     if(from && to && from > to) { setError("วันที่สิ้นสุดต้องไม่อยู่ก่อนวันที่เริ่มต้น"); return; }
     const request = ++sequence.current;
@@ -1402,9 +1394,8 @@ function Reports({ kind }: { kind: string }) {
     void load();
     return () => { sequence.current++; };
   }, [kind]);
-  const rows = (data?.rows || []).filter((r: Row) =>
-    r.user_query.includes(filter),
-  );
+  const columns = reportColumns(kind);
+  const rows = queryRows(data?.rows || [], columns, filters, sort);
   const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / pageSize)));
   useEffect(() => { setPage(currentPage); }, [currentPage]);
   function download() {
@@ -1609,30 +1600,12 @@ function Reports({ kind }: { kind: string }) {
             </div>
           )}
           <section className="panel">
-            <div className="table-toolbar">
-              <h2>
-                {kind === "unanswered"
-                  ? "รายการคำถามที่ตอบไม่ได้"
-                  : "การสนทนาล่าสุด"}
-              </h2>
-              <div className="search">
-                <FiSearch />
-                <input
-                  aria-label="ค้นหาคำถาม"
-                  placeholder="ค้นหาคำถาม…"
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                />
-              </div>
-            </div>
+            <TableControls title={kind === "unanswered" ? "รายการคำถามที่ตอบไม่ได้" : "การสนทนาล่าสุด"} columns={columns} rows={data.rows || []} filters={filters} onChange={setFilters} resultCount={rows.length} report exportable={kind === "usage"} />
             <div className="table-scroll">
               <table>
                 <thead>
                   <tr>
-                    <th>คำถาม</th>
-                    <th>วันที่</th>
-                    <th>สถานะ</th>
-                    <th>{kind === "unanswered" ? "ตรวจสอบ" : "ผลตอบรับ"}</th>
+                    {columns.map(column => <SortHeading key={column.key} column={column} sort={sort} onChange={setSort} />)}
                   </tr>
                 </thead>
                 <tbody>
