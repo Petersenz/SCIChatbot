@@ -27,6 +27,7 @@ import {
   FiHelpCircle,
   FiUser,
   FiLogOut,
+  FiChevronRight,
   FiSearch,
   FiArrowLeft,
   FiExternalLink,
@@ -372,7 +373,33 @@ function ConversationActions({busy, title, onAction}: {busy: boolean; title: str
   </div>;
 }
 
+function StaffEntry({staff, onLeave}: {staff: Row | null; onLeave: (leaving: boolean) => void}) {
+  const router = useRouter();
+  const [leaving, setLeaving] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recovery = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const href = staff ? (staff.role === "admin" ? "/admin/dashboard" : "/admin/curricula") : "/login";
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); if (recovery.current) clearTimeout(recovery.current); }, []);
+  useEffect(() => { if (!staff) router.prefetch("/login"); }, [staff, router]);
+  return <a href={publicUrl(href)} className="staff-access" aria-busy={leaving || undefined} onClick={event => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    if (staff) return;
+    event.preventDefault();
+    if (leaving) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { router.push(href); return; }
+    setLeaving(true); onLeave(true);
+    timer.current = setTimeout(() => router.push(href), 160);
+    // Restore the control if navigation stalls; never leave the page locked.
+    recovery.current = setTimeout(() => { setLeaving(false); onLeave(false); }, 1600);
+  }}>
+    <span className="staff-access-icon"><FiUser aria-hidden="true" /></span>
+    <span className="staff-access-copy"><strong>{staff ? staff.fullname : "เข้าสู่ระบบ"}</strong><small>{staff ? "จัดการระบบ" : "สำหรับเจ้าหน้าที่"}</small></span>
+    <FiChevronRight className="staff-access-chevron" aria-hidden="true" />
+  </a>;
+}
+
 function ChatApp() {
+  const [leaving, setLeaving] = useState(false);
   const [sessions, setSessions] = useState<Row[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [messages, setMessages] = useState<Row[]>([]);
@@ -494,7 +521,7 @@ function ChatApp() {
     ["อาชีพหลังจบการศึกษา", "จบไปแล้วทำงานอะไรได้บ้าง?", FiBriefcase],
   ] as const;
   return (
-    <div className="chat-shell">
+    <div className={"chat-shell" + (leaving ? " is-leaving" : "")}>
       {menu && (
         <button
           className="scrim"
@@ -509,6 +536,7 @@ function ChatApp() {
         </div>
         <FlowButton
           text="เริ่มสนทนาใหม่"
+          icon={FiEdit}
           className="new-conversation"
           disabled={busy}
           onClick={() => {
@@ -544,7 +572,7 @@ function ChatApp() {
           )}
         </nav>
         <div className="chat-side-footer">
-          <FlowButton className="staff-entry" text={staff ? staff.fullname : "เข้าสู่ระบบ"} subtitle={staff ? "จัดการระบบ" : "(สำหรับเจ้าหน้าที่)"} href={publicUrl(staff ? (staff.role === "admin" ? "/admin/dashboard" : "/admin/curricula") : "/login")} />
+          <StaffEntry staff={staff} onLeave={setLeaving} />
           <small className="version">SCI Chatbot v1.0</small>
         </div>
       </aside>

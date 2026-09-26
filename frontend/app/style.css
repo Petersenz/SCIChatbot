@@ -1549,3 +1549,37 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 @media (prefers-reduced-motion:reduce) { .flow-button,.flow-button *, .history-row .conversation-actions > button { transition:none !important; animation:none !important; } .flow-button:active:not(:disabled) { transform:none; } }
 
 .sidebar-conversation-menu { --chat-white:#fff; --chat-hover:#f3f2ef; --chat-shadow:rgba(28,28,30,.12); --chat-danger:#b42337; }
+
+/* Hallmark component critique: P4 H5 E4 S5 R5 V4. Preserve new-chat motion. */
+:root { --polish-shadow: #1c1c1e0d; --polish-hover: #f4f4f1; --polish-icon: #6b6b64; --polish-danger-hover: #fff2f2; }
+.sidebar-conversation-menu { padding:5px; border-radius:11px; box-shadow:0 4px 18px var(--polish-shadow); animation:menu-reveal .14s ease-out; }
+.sidebar-conversation-menu button { min-height:40px; padding:9px 12px; gap:11px; border-radius:7px; font-size:13px; font-weight:400; transition:background .12s; }
+.sidebar-conversation-menu button svg { width:16px; height:16px; color:var(--polish-icon); stroke-width:1.7; }
+.sidebar-conversation-menu button:hover,.sidebar-conversation-menu button:focus-visible { background:var(--polish-hover); }
+.sidebar-conversation-menu button:focus-visible { outline:2px solid var(--yellow); outline-offset:-2px; }
+.sidebar-conversation-menu .delete-action { border-top:0; border-radius:7px; margin-top:8px; position:relative; }
+.sidebar-conversation-menu .delete-action::before { content:""; position:absolute; top:-5px; left:9px; right:9px; height:1px; background:var(--border); }
+.sidebar-conversation-menu .delete-action svg { color:currentColor; }
+.sidebar-conversation-menu .delete-action:hover { background:var(--polish-danger-hover); }
+.sidebar-conversation-menu button:active { transform:translateY(1px); }
+.staff-access { display:flex; align-items:center; gap:11px; padding:10px 9px; border-radius:12px; color:var(--ink); text-decoration:none; transition:background .18s; min-height:60px; }
+.staff-access:hover { background:var(--polish-hover); text-decoration:none; }
+.staff-access-icon { display:grid; place-items:center; width:36px; height:36px; flex-shrink:0; border:1px solid var(--border); border-radius:11px; background:var(--chat-white); transition:border-color .18s,background .18s; }
+.staff-access-icon svg { width:18px; height:18px; stroke-width:1.6; }
+.staff-access-copy { flex:1; min-width:0; }
+.staff-access-copy strong { display:block; font-size:14px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.staff-access-copy small { display:block; font-size:11px; color:var(--muted); margin-top:2px; }
+.staff-access-chevron { width:15px; height:15px; color:var(--muted); transition:transform .18s; }
+.staff-access:hover .staff-access-chevron { transform:translateX(3px); }
+.staff-access:hover .staff-access-icon { background:var(--cream); border-color:var(--yellow); }
+.staff-access:focus-visible { outline:2px solid var(--yellow); outline-offset:2px; }
+.staff-access:active { background:var(--cream); }
+.chat-shell .chat-main,.chat-shell .chat-side { transition:opacity .16s ease,transform .16s ease; }
+.chat-shell.is-leaving .chat-main { opacity:0; transform:translateY(-6px); }
+.chat-shell.is-leaving .chat-side { opacity:.45; }
+.login-page .login-card { animation:login-arrive .38s cubic-bezier(.16,1,.3,1) both; }
+.login-page .back { animation:menu-reveal .25s ease both; }
+@keyframes login-arrive { from { opacity:0; transform:translateY(16px) scale(.985); } to { opacity:1; transform:translateY(0) scale(1); } }
+@keyframes menu-reveal { from {opacity:0; transform:translateY(-3px);} to {opacity:1; transform:translateY(0);} }
+@media (hover:none),(max-width:768px) { .sidebar-conversation-menu button { min-height:44px; } }
+@media (prefers-reduced-motion:reduce) { .sidebar-conversation-menu,.sidebar-conversation-menu button,.staff-access,.staff-access *,.chat-shell .chat-main,.chat-shell .chat-side,.login-page .login-card,.login-page .back { animation:none !important; transition:none !important; } .chat-shell.is-leaving .chat-main,.chat-shell.is-leaving .chat-side { opacity:1; transform:none; } }
