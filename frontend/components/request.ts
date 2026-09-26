@@ -1,7 +1,7 @@
 export class ApiError extends Error {
  constructor(message:string,public status=0,public code="network_error",public requestId="",public retryAfter:number|null=null){super(message);this.name="ApiError";}
 }
-export function remainingThinkingMs(started:number,now:number){return Math.max(0,1000-(now-started));}
+export function remainingThinkingMs(started:number,now:number){return Math.max(0,2000-(now-started));}
 export async function readApiResponse(response:Response,method="GET") {
  const write=!["GET","HEAD"].includes(method.toUpperCase());
  let data:any;

@@ -1585,8 +1585,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 @media (prefers-reduced-motion:reduce) { .sidebar-conversation-menu,.sidebar-conversation-menu button,.staff-access,.staff-access *,.chat-shell .chat-main,.chat-shell .chat-side,.login-page .login-card,.login-page .back { animation:none !important; transition:none !important; } .chat-shell.is-leaving .chat-main,.chat-shell.is-leaving .chat-side { opacity:1; transform:none; } }
 
 /* Thinking/notice components inherit SCI typography and palette. */
-:root { --status-info:#536575; --status-warn:#875c0b; --status-error:#a62937; --status-error-bg:#fff8f8; --status-info-bg:#f7f9fb; --status-warn-bg:#fff9e9; --shining-base:#62625b; --shining-highlight:#b3a677; }
-.shining-text { display:inline-block; background:linear-gradient(110deg,var(--shining-base) 35%,var(--shining-highlight) 50%,var(--shining-base) 75%); background-size:200% 100%; background-clip:text; -webkit-background-clip:text; color:transparent; font-size:14px; font-weight:400; }
+:root { --status-info:#536575; --status-warn:#875c0b; --status-error:#a62937; --status-error-bg:#fff8f8; --status-info-bg:#f7f9fb; --status-warn-bg:#fff9e9; --shining-base:#404040; --shining-highlight:#f5f3ed; }
+.shining-text { display:inline-block; background:linear-gradient(110deg,var(--shining-base) 35%,var(--shining-highlight) 50%,var(--shining-base) 65%); background-size:200% 100%; background-clip:text; -webkit-background-clip:text; color:transparent; font-size:14px; font-weight:400; }
 .thinking-status { margin:8px 0 24px 46px; min-height:28px; }
 .thinking-status small { display:block; color:var(--muted); font-size:12px; margin-top:6px; }
 .status-notice { display:flex; align-items:flex-start; gap:10px; border:1px solid currentColor; border-radius:12px; padding:12px 14px; margin:12px 0; font-size:14px; line-height:1.6; }
@@ -1603,3 +1603,73 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .notice-action { display:block; margin-top:8px; padding:6px 10px; font-size:13px; border:1px solid currentColor; background:transparent; color:inherit; border-radius:7px; min-height:36px; }
 .notice-action:hover { background:var(--surface); }
 .notice-action:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+
+/* Shared motion: quiet entrances + responsive feedback; no ambient loops. */
+:root { --motion-quick:150ms; --motion-ui:220ms; --motion-enter:360ms; --motion-ease:cubic-bezier(.16,1,.3,1); --motion-shadow:#1c1c1e0d; --rating-empty:#a5a59d; --rating-ink:#806000; }
+@keyframes sci-arrive { from {opacity:0;transform:translateY(10px);} to {opacity:1;transform:translateY(0);} }
+@keyframes sci-dialog { from {opacity:0;transform:translateY(12px) scale(.98);} to {opacity:1;transform:translateY(0) scale(1);} }
+@keyframes sci-backdrop { from {opacity:0;} to {opacity:1;} }
+@keyframes sci-star-select { 0% {transform:scale(.9);} 60% {transform:scale(1.15);} 100% {transform:scale(1);} }
+@keyframes sci-spin { to {transform:rotate(360deg);} }
+.admin-main { animation:sci-arrive var(--motion-enter) var(--motion-ease) both; }
+dialog[open] { animation:sci-dialog var(--motion-ui) var(--motion-ease) both; }
+dialog[open]::backdrop { animation:sci-backdrop var(--motion-ui) ease both; }
+.chat-shell .welcome h1 { animation:sci-arrive 420ms var(--motion-ease) both; }
+.chat-shell .welcome > p { animation:sci-arrive 420ms var(--motion-ease) 100ms both; }
+.chat-shell .suggestions { animation:sci-arrive 420ms var(--motion-ease) 180ms both; }
+
+.bot-row.answer-enter { animation:sci-arrive 240ms var(--motion-ease) both; }
+.status-notice,.rating-nudge { animation:sci-arrive var(--motion-ui) var(--motion-ease) both; }
+button:not(.flow-button):not(.history),.admin-side a,.staff-access,input,select,textarea { transition:background-color var(--motion-quick),border-color var(--motion-quick),box-shadow var(--motion-ui),transform var(--motion-quick); }
+input:focus,textarea:focus,select:focus { box-shadow:0 0 0 3px var(--cream); }
+button:not(.flow-button):not(:disabled):active { transform:scale(.98); }
+@media (hover:hover) {
+ button.primary:not(:disabled):hover { transform:translateY(-1px); box-shadow:0 4px 12px var(--motion-shadow); }
+ .chat-shell .suggestions button:hover { transform:translateY(-3px); box-shadow:0 5px 16px var(--motion-shadow); }
+ .suggestions button svg { transition:transform var(--motion-ui); }
+ .suggestions button:hover svg { transform:scale(1.08); }
+ .feedback button:hover svg { transform:translateY(-1px); }
+}
+tbody tr { transition:background-color var(--motion-quick); }
+.rating-form { padding:24px !important; }
+.rating-question { margin:0; text-align:center; color:var(--muted); line-height:1.7; }
+.rating-control { border:0; padding:24px 0 12px; margin:0; min-width:0; }
+.rating-star-row { display:flex; justify-content:center; gap:8px; }
+.rating-form .rating-star { position:relative; display:flex; flex-direction:column; align-items:center; gap:7px; margin:0; padding:8px 3px; width:52px; min-height:68px; cursor:pointer; border-radius:12px; color:var(--rating-empty); }
+.rating-star input,.rating-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.rating-star svg { width:36px; height:36px; fill:transparent; stroke-width:1.5; transition:fill var(--motion-ui),color var(--motion-ui),transform var(--motion-ui); }
+.rating-star.is-filled svg { color:var(--yellow); fill:var(--yellow); }
+.rating-star:has(input:checked) svg { animation:sci-star-select 300ms var(--motion-ease); }
+.rating-star:has(input:focus-visible) { outline:2px solid var(--rating-ink); outline-offset:2px; background:var(--cream); }
+.rating-star-number { font-size:11px; color:var(--muted); font-weight:400; }
+.rating-caption { min-height:24px; margin:12px 0 0; text-align:center; font-size:14px; color:var(--rating-ink); }
+.rating-control:disabled { opacity:.6; }
+.rating-control:disabled .rating-star { cursor:wait; }
+.rating-submit { gap:8px; }
+.rating-spinner { width:18px; height:18px; animation:sci-spin .8s linear infinite; }
+.rating-secondary { display:flex; justify-content:center; gap:16px; margin-top:12px; }
+.rating-secondary button { border:0; background:transparent; font-size:13px; color:var(--muted); min-height:40px; }
+@media (hover:hover) { .rating-star:hover svg { transform:translateY(-3px) scale(1.08); } }
+@media (max-width:375px) { .rating-form { padding:20px 14px !important; } .rating-star-row { gap:2px; } .rating-form .rating-star { width:46px; } }
+@media (prefers-reduced-motion:reduce) {
+ *,*::before,*::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; }
+ .rating-star:hover svg,.suggestions button:hover,button.primary:not(:disabled):hover,button:not(.flow-button):not(:disabled):active { transform:none; }
+}
+
+dialog:has(.rating-form) { width:min(500px,calc(100vw - 32px)); }
+
+/* Public welcome: one full entrance per tab session; admin stays restrained. */
+.chat-shell .welcome:not(.welcome--full) h1,
+.chat-shell .welcome:not(.welcome--full) > p,
+.chat-shell .welcome:not(.welcome--full) .suggestions { animation:none; }
+.chat-shell .welcome--short { animation:sci-arrive 180ms var(--motion-ease) both; }
+.chat-shell .welcome--full .logo-mark { animation:sci-arrive 600ms var(--motion-ease) both; }
+.chat-shell .welcome--full .suggestions button { animation:sci-arrive 480ms var(--motion-ease) both; }
+.chat-shell .welcome--full .suggestions button:nth-child(2) { animation-delay:80ms; }
+.chat-shell .welcome--full .suggestions button:nth-child(3) { animation-delay:160ms; }
+.chat-shell .welcome--full .suggestions button:nth-child(4) { animation-delay:240ms; }
+.field-hint { color:var(--muted);font-size:12px;line-height:1.6; }
+.form-grid input:user-invalid,.form-grid textarea:user-invalid,.form-grid select:user-invalid { border-color:#b42318; }
+@media (prefers-reduced-motion:reduce) {
+ .chat-shell .welcome,.chat-shell .welcome *, .bot-row.answer-enter { animation:none !important; }
+}

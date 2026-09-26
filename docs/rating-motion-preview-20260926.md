@@ -1,0 +1,9 @@
+# Rating and shared motion — pending review, no deployment
+
+Existing rating1–5 API/data remains. New RatingForm uses accessible native radios + lucide Star in SCIyellow, cumulative fill, hoverpreview, selectedbounce, scorecaption, explicit Save, pending lock/spinner and inlineerror. No styled-components dependency: use existing CSS system. Selecting a star no longer writes immediately; confirmation submits the same PATCH rating payload. Save success updates local session and closes; no secondlistrequest can mislabel a successful save. Empty selection disables Save. Existing new-chat/later actions retained.
+
+Shared motion tokens:150ms feedback,220ms UI,360ms pageentry. Added dialog/backdrop entrance, staggered welcome, new answer entry, adminpage entry keyed byroute, card/icon/buttonhover, fieldfocus and noticeentry. Existing FlowButton motion/icon and stafflogin/shining remain. No ambient loop apart from actualpending indicators. Universal reduced-motion override; no observers hiding content, no backendchanges, no newevaluationquestion/role/table.
+
+Checks: combined candidate productionbuild/TypeScript+diffcheck pass. Preview ratingemptySave disabled, radio4/cumulativeyellow screenshot, keyboardright->5/caption5pass, latercancel restoresmenu trigger. Found/fixed hoverstate shadowing keyboardchoice. Responsive320/375/414/768 no root horizontaloverflow anddialog insideviewport. Browsererrors0. No actual ratingPATCH submitted; backend contract reviewed but save/error states not fault-injected. AdminsharedCSS implemented but every authenticated screen not visually audited. OSreduced-motion not toggled. Scopeclaims limited accordingly.
+
+Hold: user explicitly deferred deployment; preserve production6d139f2. Pending Englishthinking2s/favicon changes remain included. No gitpush, release or service restart. Next review then deploy only whenPeterrequests.

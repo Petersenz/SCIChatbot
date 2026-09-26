@@ -3,7 +3,7 @@ const file=require('path').join(__dirname,'../frontend/components/request.ts');
 const apiExports={};let fakeFetch=fetch;
 vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:apiExports,Response,AbortController,setTimeout,clearTimeout,fetch:(...args)=>fakeFetch(...args)});
 (async()=>{
-assert.equal(apiExports.remainingThinkingMs(100,300),800);assert.equal(apiExports.remainingThinkingMs(100,1400),0);
+assert.equal(apiExports.remainingThinkingMs(100,300),1800);assert.equal(apiExports.remainingThinkingMs(100,2400),0);
 assert.deepEqual(JSON.parse(JSON.stringify(await apiExports.readApiResponse(new Response('{"ok":true}')))),{ok:true});
 for(const status of [401,403,409,413,422,429,500,502,503,504]){
  let error;try{await apiExports.readApiResponse(new Response('{"detail":"server message","request_id":"abcdef123456"}',{status,headers:{'Retry-After':'12'}}),'POST')}catch(e){error=e}

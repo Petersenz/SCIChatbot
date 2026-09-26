@@ -1,10 +1,11 @@
 "use client";
 import { createPortal } from "react-dom";
+import {RatingForm} from "@/components/ui/rating-form";
 import {ThinkingIndicator} from "@/components/ui/thinking-indicator";
 import {StatusNotice} from "@/components/ui/status-notice";
 import {requestJson, remainingThinkingMs} from "./request";
 import { FlowButton } from "@/components/ui/flow-button";
-import { useEffect, useState, useRef, FormEvent } from "react";
+import { useEffect, useState, useRef, useId, ReactNode, FormEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   FiMenu,
@@ -246,7 +247,7 @@ export default function App() {
           </button>
         </div>
       </aside>
-      <main id="main" className="admin-main">
+      <main id="main" className="admin-main" key={page}>
         {error && (
           <p role="alert" className="alert">
             {error}
@@ -299,6 +300,7 @@ function Login({ onLogin }: { onLogin: (u: Row) => void }) {
               name="password"
               type="password"
               autoComplete="current-password"
+                maxLength={200}
               required
             />
           </label>
@@ -399,8 +401,21 @@ function StaffEntry({staff, onLeave}: {staff: Row | null; onLeave: (leaving: boo
   </a>;
 }
 
+function WelcomeSurface({children}: {children: ReactNode}) {
+  const [entrance, setEntrance] = useState("quiet");
+  useEffect(() => {
+    try {
+      const key = "sci-welcome-seen-v1";
+      const seen = sessionStorage.getItem(key);
+      sessionStorage.setItem(key, "1");
+      setEntrance(seen ? "short" : "full");
+    } catch { setEntrance("short"); }
+  }, []);
+  return <section className={`welcome welcome--${entrance}`}>{children}</section>;
+}
 function ChatApp() {
   const sendLock=useRef(false);
+  const [freshAnswer, setFreshAnswer] = useState<number | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [sessions, setSessions] = useState<Row[]>([]);
   const [active, setActive] = useState<string | null>(null);
@@ -491,6 +506,7 @@ function ChatApp() {
       // Presentation delay only; backend/API latency remains unchanged.
       const remaining=remainingThinkingMs(started,performance.now());
       if(remaining>0) await new Promise(resolve=>setTimeout(resolve,remaining));
+      setFreshAnswer(item.id);
       setMessages((m) => [...m.filter((x) => x.id !== -1), item]);
       void refresh().catch(()=>setError("คำตอบบันทึกแล้ว แต่โหลดรายการประวัติไม่สำเร็จ กรุณารีเฟรชประวัติ ไม่ต้องส่งคำถามซ้ำ"));
     } catch (e) {
@@ -513,13 +529,11 @@ function ChatApp() {
     }
   }
   async function rate(n: number) {
-    try {
-      await api("/conversations/" + modalSession?.id, "PATCH", { rating: n });
-      await refresh();
-      setModal(null);
-    } catch (e) {
-      setError((e as Error).message);
-    }
+    const sessionId=modalSession?.id;
+    if(!sessionId) throw new Error("ไม่พบบทสนทนา กรุณาเปิดประวัติอีกครั้ง");
+    await api("/conversations/"+sessionId,"PATCH",{rating:n});
+    setSessions(rows=>rows.map(row=>row.id===sessionId?{...row,rating:n}:row));
+    setModal(null);
   }
   const suggestions = [
     ["สาขาวิชา", "คณะวิทยาศาสตร์ มีสาขาอะไรบ้าง?", FiBookOpen],
@@ -591,7 +605,7 @@ function ChatApp() {
         </div>
         <div className="chat-scroll">
           {messages.length === 0 ? (
-            <section className="welcome">
+            <WelcomeSurface>
               <Mark large />
               <h1>
                 ยินดีต้อนรับสู่ <span>ไซน์แชทบอท</span>
@@ -610,7 +624,7 @@ function ChatApp() {
                   </button>
                 ))}
               </div>
-            </section>
+            </WelcomeSurface>
           ) : (
             <div
               className="messages"
@@ -622,7 +636,7 @@ function ChatApp() {
                 <div key={m.id} className="turn">
                   <div className="user-message">{m.user_query}</div>
                   {m.bot_response && (
-                    <div className="bot-row">
+                    <div className={`bot-row${freshAnswer === m.id ? " answer-enter" : ""}`} onAnimationEnd={() => setFreshAnswer(null)}>
                       <Mark />
                       <div className="bot-content">
                         <AnswerText text={m.bot_response} sources={m.sources || []} />
@@ -810,32 +824,11 @@ function ChatApp() {
       )}
       {modal === "rate" && (
         <Modal title="ประเมินความพึงพอใจ" close={() => setModal(null)}>
-          <p>คุณพึงพอใจกับการสนทนาครั้งนี้มากน้อยเพียงใด?</p>
-          <div className="stars">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                aria-label={n + " ดาว"}
-                aria-pressed={modalSession?.rating === n}
-                onClick={() => rate(n)}
-              >
-                <FiStar />
-                <span>{n}</span>
-              </button>
-            ))}
-          </div>
-          <div className="actions">
-            <button
-              onClick={() => {
-                if (active) setDismissed([...dismissed, active]);
-                setModal(null);
-                reset();
-              }}
-            >
-              เริ่มสนทนาใหม่
-            </button>
-            <button onClick={() => setModal(null)}>ไว้ภายหลัง</button>
-          </div>
+          <RatingForm key={modalSession?.id} initial={modalSession?.rating || 0} onRate={rate}
+            onLater={()=>setModal(null)} onNew={()=>{
+              if(active)setDismissed([...dismissed,active]);
+              setModal(null);reset();
+            }}/>
         </Modal>
       )}
     </div>
@@ -1127,6 +1120,14 @@ function FieldInput({
   lookups: Row;
   user: Row;
 }) {
+  const hintId = useId();
+  const hint = f.type === "password" ? "อย่างน้อย 10 ตัวอักษร ไม่เกิน 200 ตัวอักษร" :
+    f.type === "number" ? "กรอกตัวเลขตั้งแต่ 0 ขึ้นไป" :
+    f.type === "url" ? "ใช้ลิงก์เต็มที่ขึ้นต้นด้วย https:// หรือ http://" :
+    f.type === "textarea" ? "กรอกข้อมูลที่ตรวจสอบแล้ว ไม่เกิน 25,000 ตัวอักษร" : "";
+  const placeholder = f.type === "email" ? "name@example.com" :
+    f.type === "url" ? "https://…" : f.type === "password" ? "กรอกรหัสผ่าน" :
+    f.type === "number" ? "0" : `กรอก${f.label}`;
   const [upload, setUpload] = useState(value || "");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -1212,6 +1213,8 @@ function FieldInput({
         <textarea
           name={f.key}
           rows={4}
+          placeholder={placeholder}
+          aria-describedby={hint ? hintId : undefined}
           defaultValue={value || ""}
           required={f.required}
           maxLength={25000}
@@ -1240,6 +1243,8 @@ function FieldInput({
         <input
           name={f.key}
           type={f.type}
+          placeholder={placeholder}
+          aria-describedby={hint ? hintId : undefined}
           defaultValue={f.type === "password" ? "" : (value ?? "")}
           min={f.type === "number" ? 0 : undefined}
           step={f.type === "number" ? (["tuition_fee", "salary_start"].includes(f.key) ? "0.01" : "1") : undefined}
@@ -1250,6 +1255,7 @@ function FieldInput({
           required={f.required}
         />
       )}
+      {hint && <small id={hintId} className="field-hint">{hint}</small>}
     </label>
   );
 }
@@ -1309,15 +1315,15 @@ function Profile({
             </label>
             <label>
               ชื่อ–นามสกุล
-              <input name="fullname" required defaultValue={user.fullname} />
+              <input name="fullname" required maxLength={255} placeholder="ชื่อ–นามสกุล" defaultValue={user.fullname} />
             </label>
             <label>
               อีเมล
-              <input name="email" type="email" defaultValue={user.email} />
+              <input name="email" type="email" maxLength={255} placeholder="name@example.com" defaultValue={user.email} />
             </label>
             <label>
               เบอร์โทรศัพท์
-              <input name="tel_no" defaultValue={user.tel_no} />
+              <input name="tel_no" type="tel" maxLength={20} placeholder="เบอร์โทรศัพท์ติดต่อ" defaultValue={user.tel_no} />
             </label>
             <label>
               รหัสผ่านเดิม
@@ -1325,6 +1331,7 @@ function Profile({
                 name="current_password"
                 type="password"
                 autoComplete="current-password"
+                maxLength={200}
               />
             </label>
             <label>
@@ -1332,6 +1339,8 @@ function Profile({
               <input
                 name="new_password"
                 type="password"
+                maxLength={200}
+                placeholder="อย่างน้อย 10 ตัวอักษร"
                 minLength={10}
                 autoComplete="new-password"
               />
