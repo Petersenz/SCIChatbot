@@ -30,7 +30,7 @@ TOPICS = (
     TopicSpec('tuition', ('curricula',), ('ค่าเทอม', 'ค่าเล่าเรียน', 'ค่าธรรมเนียม', 'ค่าใช้จ่ายในการเรียน'), 'ค่าเทอม'),
     TopicSpec('scholarship', ('general',), ('ทุน', 'กยศ', 'กู้เรียน', 'กู้ค่าเรียน'), 'ทุนการศึกษา'),
     TopicSpec('admissions', ('general', 'news'), ('สมัคร', 'คุณสมบัติผู้สมัคร', 'เอกสารสมัคร'), 'วิธีสมัคร'),
-    TopicSpec('staff', ('general',), ('อาจารย์', 'บุคลากร'), 'บุคลากร'),
+    TopicSpec('staff', ('general', 'majors'), ('อาจารย์', 'บุคลากร'), 'บุคลากร'),
     TopicSpec('services', ('general',), ('บริการนักศึกษา', 'บริการให้นักศึกษา'), 'บริการนักศึกษา'),
     TopicSpec('career', ('careers', 'curricula'), ('อาชีพ', 'ทำงาน', 'จบไป', 'เงินเดือน', 'รายได้', 'ค่าตอบแทน', 'ทักษะ', 'ทำเว็บ'), 'อาชีพ'),
     TopicSpec('news', ('news',), ('ข่าว', 'กิจกรรม', 'โครงการ', 'อบรม', 'open house'), 'ข่าว'),
@@ -238,10 +238,15 @@ def make_plan(q, history, catalog):
             scope_names = named or (() if broad else old.major_names if old else ())
             candidates = [e for e in catalog.entities if e.table == 'general' and detect_route(canonical(e.title)) == route]
             if scope_names:
-                candidates = [e for e in candidates if all(name in canonical(e.title) for name in scope_names)]
+                scoped = [e for e in candidates if all(name in canonical(e.title) for name in scope_names)]
+                common = [e for e in candidates if 'ส่วนกลาง' in e.title and not any(m.major_name_th in canonical(e.title) for m in catalog.majors)]
+                candidates = scoped or (common if route in ('services', 'scholarship', 'admissions') and 'เฉพาะ' not in current else [])
             else:
                 candidates = [e for e in candidates if not any(m.major_name_th in canonical(e.title) for m in catalog.majors)]
             entities = tuple(candidates)
+        if route in ('services', 'scholarship', 'admissions') and 'เฉพาะ' in current:
+            entities = tuple(e for e in entities if 'ส่วนกลาง' not in e.title)
+            general_scope_resolved = not entities
         prior = [SimpleNamespace(user_query=old.query)] if old and not broad and not fresh_news else []
         expanded = resolve(current, prior, catalog.majors, catalog.career_titles)
         if broad:

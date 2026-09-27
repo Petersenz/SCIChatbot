@@ -57,6 +57,10 @@ def named_news(q, rows):
 
 def retrieve_managed(db, q, majors, curricula, plan=None):
     """None delegates to semantic search; [] means this route has no evidence."""
+    from .major_sections import owned_sources
+    owned = owned_sources(plan, majors)
+    if owned:
+        return owned
     if plan and plan.general_scope_resolved and not plan.entities:
         # An empty scoped catalog lookup is not permission to search another
         # major's documents. Contact fields may also live on the major itself.
