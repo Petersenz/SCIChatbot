@@ -41,8 +41,8 @@ def test_default_new_record_without_publication_date(db,q):
  body,sources,answered,_,mode=rag.answer(db,q,[])
  assert [s['url'] for s in sources]==['/records/news/11']
  assert answered and mode=='grounded'
- assert 'New Student Award' in body and '27/09/2569' in body
- assert 'วันที่เพิ่มข้อมูล' in body
+ assert 'New Student Award' in body and '[1]' in body
+ assert 'วันที่เพิ่มข้อมูล' not in body and 'ในระบบ' not in body
 
 def test_explicit_publication_order(db):
  assert [s['url'] for s in retrieve(db,'ข่าวที่เผยแพร่ล่าสุดคืออะไร')]==['/records/news/10']

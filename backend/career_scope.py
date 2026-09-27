@@ -55,8 +55,9 @@ Complex comparisons or recommendations remain with the grounded LLM path.
     if not (salary or skills):
         return None
     scope = sources[0]['career_fact']['major']
-    lines = [f'สำหรับสาขา{scope} ข้อมูลอาชีพที่เชื่อมโยงไว้ในระบบมีดังนี้ค่ะ:' if scope
-             else 'ข้อมูลของอาชีพที่คุณระบุในระบบมีดังนี้ค่ะ:']
+    subject = 'เงินเดือนโดยประมาณ' if salary else 'ทักษะที่จำเป็น'
+    scope_text = f'สำหรับสาขา{scope} ' if scope else ''
+    lines = [f'{scope_text}{subject}มีดังนี้ค่ะ:']
     supported = False
     for i, source in enumerate(sources, 1):
         fact = source['career_fact']
@@ -69,16 +70,16 @@ Complex comparisons or recommendations remain with the grounded LLM path.
                 parts.append('ข้อมูลเงินเดือนที่มีเป็นฐานของผู้มีประสบการณ์ จึงยังยืนยันเงินเดือนสำหรับผู้จบใหม่ไม่ได้')
             else:
                 supported = True
-                parts.append(f'ค่าประมาณตามข้อมูลที่บันทึก {amount:,.0f} บาท/เดือน')
+                parts.append(f'ประมาณ {amount:,.0f} บาท/เดือน')
                 qualifiers = [line.strip() for line in fact['description'].splitlines()
                               if line.startswith(('ระดับประสบการณ์', 'วิธีประมาณ:', 'ฐานเปรียบเทียบ:'))]
                 parts.extend(qualifiers)
                 if not qualifiers:
-                    parts.append('รายการนี้ไม่ได้ระบุระดับประสบการณ์ที่ใช้เป็นฐาน')
+                    parts.append('ไม่ระบุระดับประสบการณ์')
         if skills:
             parts.append('ทักษะ: ' + (fact['skills'] or 'ยังไม่มีข้อมูลทักษะในรายการนี้'))
             supported |= bool(fact['skills'])
         lines.append(f'• {source["title"]}: ' + ' — '.join(parts) + f' [{i}]')
     if salary:
-        lines.append('ตัวเลขนี้ไม่ใช่รายได้ที่รับรอง และไม่ควรถือว่าทุกรายการเป็นอัตราสำหรับผู้จบใหม่')
+        lines.append('รายได้จริงขึ้นอยู่กับนายจ้างและประสบการณ์')
     return '\n\n'.join(lines), supported

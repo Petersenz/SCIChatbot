@@ -1,0 +1,13 @@
+# Natural answer style — 27 September 2026
+
+Candidate branchfix/natural-answer-style; livebaselineb79bff4. User requested confident, natural, professional answers across topics without internal-storage narration. This is presentation change only: retrieval, ordering, document facts, intent configuration, citations, sourceimages and roles unchanged.
+
+SharedRESPONSE_STYLE applies to bothconfiguredproviders and allLLMtopics: answerfirst, no DB/RAG/operator narration, no automaticstorage dates, shorttargetedmissinginformation, no unsupportedcertainty, preserveyear/unit/experience/estimationconstraints. Changedpromptparticipatesgenerationcachekey, so previousgeneratedcachedoesnotbypassnewstyle. Existinghistoryandstaff-authoredintentanswersnotrewritten; commonpolitetoneboundaryretained.
+
+Directnewsheadline now title+citation without ข่าวที่เพิ่มล่าสุดในระบบ or unsolicitedcreated_at/disclaimer; datequestionsdelegateexistinggroundedevidencepath. Directsalary/skills keepmajorscope andqualifiers withshorternaturalwording; removeinternalrelationphrases andredundantgenericnewgradwarningwhilekeepingrecord-specificexperiencedsalarycaveats. MissingcareerevidencestateswhatismissingwithoutSQLrelationdetails. Explicitpublicationcoverageuncertaintyremainsconcise whereitmatters. AddedEnglishword/Thaiค่ะ spacing soThailandค่ะ becomesThailand ค่ะ.
+
+Final120tests passed1.87s, gitdiffcheckpassed. Sharedtone7topicfactfixtures, provider-pathcoverage, newstyle/newsdatequestion/major-salary-qualifiers, existingcontext/planner/news/grounded/intro/providerregressions. ThisdoesnotcertifyeveryLLMutterance. Initialnewsfallbacktestassertedoldcoveragewording; updatedtoneassertionwhilekeepingcoverageassertion,thenpassed.
+
+ActualDBreadonlypreview: latestnews75correct/noaddeddate/noDBnarration; salaryfollowupcareer3correct15000+CSscope/unspecifiedexperience; contactrequestreturnedbriefno-evidenceviaGroq. Previewfirstassertexpectedall3supportedfailedoncontact; that'snotproofofaretrievalbug andnotcountedasfactualanswerpass. Revisedrecordingreportspreviewtruthfully. NoProductionwrites orchatUItest/activation; prerecordednewsimagesunchanged.
+
+Release: prepareimmutablecandidatewithunchangedfrontendbuild; currenttask-specificapprovalrequiredbeforeatomiccurrent+onlySCIAPIrestart. Preserveb79bff4rollback. Freshidle/health/resource/nginxsyntaxcheck,before/afterDBcounts andlegacy/Nginxhashes;rollbackifhealthfails. NoDBmigration/provider/env/Nginxchange. No3chapteredit. Pendinguserapproval,notlive.

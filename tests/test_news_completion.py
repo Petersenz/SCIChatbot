@@ -86,7 +86,7 @@ def test_latest_answer_always_discloses_coverage(monkeypatch, retry_state):
     with Session() as db:
         body, sources, answered, _, mode = rag.answer(db, 'ข่าวที่เผยแพร่ล่าสุดของคณะวิทยาศาสตร์และเทคโนโลยีคือข่าวอะไร', [])
     assert answered and mode == 'gemini'
-    assert 'ยังไม่ยืนยันว่าเป็นข่าวล่าสุดบนเว็บไซต์คณะ' in body
+    assert 'ยังยืนยันข่าวล่าสุดบนเว็บไซต์คณะไม่ได้' in body
     assert [s['url'] for s in sources] == ['/records/news/10']
 
 
@@ -101,4 +101,4 @@ def test_fallback_explains_failure_without_internal_news_prefix(code, wording):
 def test_latest_fallback_keeps_scope_and_marks_truncation():
     message = rag.fallback_message(UpstreamError(503), {'text':'ข่าวที่มีวันที่เผยแพร่ล่าสุดในข้อมูลที่จัดเก็บ:\n' + 'ก'*700})
     assert '…' in message
-    assert 'ยังไม่ยืนยันว่าเป็นข่าวล่าสุดบนเว็บไซต์คณะ' in message
+    assert 'ยังยืนยันข่าวล่าสุดบนเว็บไซต์คณะไม่ได้' in message

@@ -24,13 +24,9 @@ def added_news(rows):
 def latest_answer(q, sources):
     # Specific event details still go through grounded generation, not a headline.
     if recency_mode(q) != 'added' or any(word in q for word in
-        ('ที่ไหน', 'วันไหน', 'เมื่อไหร่', 'ใครบ้าง', 'มีใคร', 'ผู้ดูแล', 'กี่คน', 'สมัคร', 'รายละเอียด', 'เอกสาร')):
+        ('วันที่', 'เพิ่มวัน', 'เพิ่มเมื่อ', 'ที่ไหน', 'วันไหน', 'เมื่อไหร่', 'ใครบ้าง', 'มีใคร', 'ผู้ดูแล', 'กี่คน', 'สมัคร', 'รายละเอียด', 'เอกสาร')):
         return None
     if not sources or not all(s['text'].startswith('ข่าวที่เพิ่มล่าสุดในระบบ\n') for s in sources):
         return None
-    lines = ['ข่าวที่เพิ่มล่าสุดในระบบคือ:']
-    for i, item in enumerate(sources, 1):
-        # Date is supplied by retrieval, separately from event/publication dates.
-        added = item['text'].split('\n', 2)[1]
-        lines.append(f"{item['title']} [{i}]\n{added}")
-    return '\n\n'.join(lines), True
+    # Selection dates remain retrieval evidence, not unsolicited answer prose.
+    return '\n\n'.join(f"{item['title']} [{i}]" for i, item in enumerate(sources, 1)), True

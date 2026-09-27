@@ -414,7 +414,7 @@ def fallback_message(exc, source):
         excerpt += '…'
     body = status + '\n\nข้อความจากแหล่งข้อมูลที่ค้นพบ (ยังไม่ได้สรุป):\n' + excerpt
     if latest:
-        body += '\n\nอ้างอิงเฉพาะข่าวในระบบที่ระบุวันที่เผยแพร่ ยังไม่ยืนยันว่าเป็นข่าวล่าสุดบนเว็บไซต์คณะ'
+        body += '\n\nวันที่เผยแพร่อ้างอิงจากข่าวที่มีข้อมูลวันที่ชัดเจน จึงยังยืนยันข่าวล่าสุดบนเว็บไซต์คณะไม่ได้'
     return body
 
 
@@ -455,7 +455,7 @@ def _answer(db, q, history):
     if not sources and topic(query) == 'career':
         named = [m.major_name_th for m in db.scalars(select(MODELS['majors'])) if m.major_name_th in query]
         scope = 'สาขา' + named[0] if len(named) == 1 else 'อาชีพที่ระบุ'
-        return (f'ยังไม่มีข้อมูลอาชีพที่เชื่อมโยงตรงกับคำถามนี้สำหรับ{scope}ในระบบ จึงยังยืนยันรายละเอียดไม่ได้ค่ะ', [], False, intent.id if intent else None, 'no_evidence')
+        return (f'ยังไม่มีข้อมูลอาชีพสำหรับ{scope}เพียงพอที่จะตอบคำถามนี้ค่ะ', [], False, intent.id if intent else None, 'no_evidence')
     if not sources:
         return (
             "ยังไม่พบข้อมูลที่ตรงกับคำถามนี้ กรุณาสอบถามคณะวิทยาศาสตร์และเทคโนโลยีโดยตรง หรือระบุสาขาวิชาที่สนใจเพิ่มเติมครับ",
@@ -528,7 +528,7 @@ def _answer(db, q, history):
         else:
             body, sources = cited_sources(body, sources)
             if any(s['text'].startswith('ข่าวที่มีวันที่เผยแพร่ล่าสุดในข้อมูล') for s in sources):
-                body += '\n\nอ้างอิงเฉพาะข่าวในระบบที่ระบุวันที่เผยแพร่ ยังไม่ยืนยันว่าเป็นข่าวล่าสุดบนเว็บไซต์คณะ'
+                body += '\n\nวันที่เผยแพร่อ้างอิงจากข่าวที่มีข้อมูลวันที่ชัดเจน จึงยังยืนยันข่าวล่าสุดบนเว็บไซต์คณะไม่ได้'
             generation_cache.put(cache_key, (body, sources))
         return body, with_images(db, sources), not unknown, intent.id if intent else None, provider
     except Exception as exc:
