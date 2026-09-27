@@ -9,6 +9,7 @@ from .text_processing import normalize_text, split_evidence
 from .query_understanding import resolve, canonical, ambiguity, topic, TERM, STUDY
 from .structured_evidence import retrieve_managed
 from .career_scope import career_answer
+from .news_recency import latest_answer
 from .conversation_plan import Catalog, PlannedQuery, make_plan
 from .intent_matching import semantic_static_intent
 logger = logging.getLogger("uvicorn.error")
@@ -463,7 +464,7 @@ def _answer(db, q, history):
             intent.id if intent else None,
             "no_evidence",
         )
-    fixed = career_answer(query, sources) or exact_answer(query, sources)
+    fixed = latest_answer(query, sources) or career_answer(query, sources) or exact_answer(query, sources)
     if fixed:
         body, supported = fixed
         logger.info('rag_grounded_answer supported=%s', supported)

@@ -15,7 +15,7 @@ def test_publication_not_event_or_import_date():
     assert published_date('โพสต์เมื่อ 31 กุมภาพันธ์ 2569') is None
 
 
-@pytest.mark.parametrize('q', ['ข่าวล่าสุดของคณะวิทยาศาสตร์และเทคโนโลยีคือข่าวอะไร', 'ข่าวใหม่สุดของคณะ', 'มีข่าวอะไรล่าสุด'])
+@pytest.mark.parametrize('q', ['ข่าวที่เผยแพร่ล่าสุดของคณะวิทยาศาสตร์และเทคโนโลยีคือข่าวอะไร', 'ข่าวที่โพสต์ใหม่สุดของคณะ', 'มีข่าวอะไรเผยแพร่ล่าสุด'])
 def test_latest_uses_published_date(q):
     with Session() as db:
         sources = rag.retrieve(db, q)
@@ -84,7 +84,7 @@ def test_latest_answer_always_discloses_coverage(monkeypatch, retry_state):
     client.models.generate_content.return_value.text = 'ข่าวล่าสุดคือการประเมิน EdPEx [1]'
     monkeypatch.setattr(genai, 'Client', Mock(return_value=client))
     with Session() as db:
-        body, sources, answered, _, mode = rag.answer(db, 'ข่าวล่าสุดของคณะวิทยาศาสตร์และเทคโนโลยีคือข่าวอะไร', [])
+        body, sources, answered, _, mode = rag.answer(db, 'ข่าวที่เผยแพร่ล่าสุดของคณะวิทยาศาสตร์และเทคโนโลยีคือข่าวอะไร', [])
     assert answered and mode == 'gemini'
     assert 'ยังไม่ยืนยันว่าเป็นข่าวล่าสุดบนเว็บไซต์คณะ' in body
     assert [s['url'] for s in sources] == ['/records/news/10']

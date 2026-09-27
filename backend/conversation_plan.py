@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from sqlalchemy import select
 from .db import MODELS
 from .query_understanding import canonical, resolve, topic, general_topic, YEAR, STUDY, TERM
+from .news_recency import recency_mode
 from .career_scope import career_names, broad_career_question
 
 PUBLIC_TABLES = ('majors', 'curricula', 'careers', 'general', 'news')
@@ -190,7 +191,8 @@ def make_plan(q, history, catalog):
         if any(e.table == 'general' for e in explicit) and route is None:
             route = 'general'
         broad = any(x in current for x in ('ทั้งคณะ', 'ของคณะ', 'ทุกสาขา', 'คณะมี', 'คณะตั้ง'))
-        reference = any(x in current for x in REFERENCES) or current.startswith('แล้ว')
+        fresh_news = route == 'news' and bool(recency_mode(current))
+        reference = (any(x in current for x in REFERENCES) or current.startswith('แล้ว')) and not fresh_news
         returning = any(x in current for x in ('กลับมา', 'กลับไป', 'เรื่องเดิม'))
         old = frames.get(route) if returning and route in frames else active
         if route is None and reference and old:
@@ -240,7 +242,7 @@ def make_plan(q, history, catalog):
             else:
                 candidates = [e for e in candidates if not any(m.major_name_th in canonical(e.title) for m in catalog.majors)]
             entities = tuple(candidates)
-        prior = [SimpleNamespace(user_query=old.query)] if old and not broad else []
+        prior = [SimpleNamespace(user_query=old.query)] if old and not broad and not fresh_news else []
         expanded = resolve(current, prior, catalog.majors, catalog.career_titles)
         if broad:
             names = named

@@ -5,6 +5,7 @@ from difflib import SequenceMatcher
 from sqlalchemy import select
 from .db import MODELS, CurriculumCareer, Document
 from .career_scope import career_names
+from .news_recency import recency_mode, added_news, timestamp, BANGKOK
 from .query_understanding import topic, YEAR, mentioned_majors, whole_curriculum, general_topic
 
 
@@ -68,7 +69,7 @@ def retrieve_managed(db, q, majors, curricula, plan=None):
                     any(getattr(m, field, None) for field in ('tel', 'email', 'website_url', 'facebook_page'))]
         return []
     # A resolved entity is read by identity, not rediscovered by similarity.
-    if plan and plan.entities and all(e.table in ('news', 'general') for e in plan.entities):
+    if plan and plan.entities and all(e.table in ('news', 'general') for e in plan.entities) and not (plan.route == 'news' and recency_mode(q)):
         selected = []
         for entity in plan.entities:
             row = db.get(MODELS[entity.table], entity.id)
@@ -200,7 +201,14 @@ def retrieve_managed(db, q, majors, curricula, plan=None):
         english = re.findall(r'[a-zA-Z]{3,}', q.lower())
         if english and not event_rows:
             rows = [r for r in rows if all(w in (r.title + ' ' + (r.content or '')).lower() for w in english)]
-        if any(w in q for w in ['ล่าสุด', 'ใหม่สุด', 'ใหม่ที่สุด']):
+        if recency_mode(q) == 'added':
+            rows = added_news(rows)
+            return [source(r.title, f'/records/news/{r.id}',
+                           'ข่าวที่เพิ่มล่าสุดในระบบ\nวันที่เพิ่มข้อมูล: ' +
+                           timestamp(r.created_at).astimezone(BANGKOK).strftime('%d/%m/') +
+                           str(timestamp(r.created_at).astimezone(BANGKOK).year + 543) +
+                           ' (ไม่ใช่วันเผยแพร่หรือวันจัดกิจกรรม)\n' + (r.content or '')) for r in rows]
+        if recency_mode(q) == 'published':
             dated = [(published_date(r.content), r) for r in rows]
             dated = [(d, r) for d, r in dated if d is not None and d <= date.today()]
             if not dated:
