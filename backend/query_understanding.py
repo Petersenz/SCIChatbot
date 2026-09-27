@@ -37,7 +37,7 @@ def topic(q):
         return 'contact'
     if any(t in q for t in ['ก่อตั้ง', 'ประวัติคณะ']):
         return 'history'
-    if any(t in q for t in ['วิสัยทัศน์', 'พันธกิจ']):
+    if any(t in q for t in ['วิสัยทัศน์', 'พันธกิจ', 'ปรัชญา', 'ปณิธาน', 'ค่านิยมองค์กร', 'อัตลักษณ์', 'เอกลักษณ์']):
         return 'mission'
     return 'curriculum'
 

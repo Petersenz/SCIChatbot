@@ -49,7 +49,28 @@ def prepare_sources(sources):
         result.append(item)
     return result
 
-def exact_answer(question, sources):
+def official_sections(question, source):
+    """Preserve requested formal statements and their original item numbering."""
+    if not source.get('url', '').startswith('/records/general/') or re.search(r'สรุป|อธิบาย|หมายความ|เปรียบเทียบ', question):
+        return None
+    labels = ('ปรัชญา', 'ปณิธาน', 'วิสัยทัศน์', 'พันธกิจ', 'ค่านิยมองค์กร', 'อัตลักษณ์', 'เอกลักษณ์คณะ', 'เอกลักษณ์มหาวิทยาลัย')
+    wanted = [label for label in labels if label in question]
+    if not wanted:
+        return None
+    sections = {}; active = None
+    for line in source['text'].splitlines():
+        label = line.strip().rstrip(':：')
+        if label in labels:
+            if label in sections: return None  # Ambiguous duplicate heading.
+            active = label; sections[active] = []
+        elif active and line.strip():
+            sections[active].append(line.strip())
+    if not all(sections.get(label) for label in wanted):
+        return None
+    return '\n\n'.join('## ' + label + '\n' + '\n'.join(sections[label]) + ' [1]' for label in wanted), True
+
+
+def exact_answer(question, sources, *, original_question=None):
     """Return grounded display text only when the requested facts are unambiguous.
 
     This path is shared across providers; factual values come from current
@@ -59,6 +80,9 @@ def exact_answer(question, sources):
         return None
     source = sources[0]
     content = source['text']
+    formal = official_sections(original_question if original_question is not None else question, source)
+    if formal:
+        return formal
     if overview_style(question) and content.startswith('ข้อมูลจากหน้าแนะนำสาขาวิชา:'):
         # An overview may select/format the existing managed description; it
         # must not invent careers/courses from the degree name.

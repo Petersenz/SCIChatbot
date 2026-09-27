@@ -464,7 +464,7 @@ def _answer(db, q, history):
             intent.id if intent else None,
             "no_evidence",
         )
-    fixed = latest_answer(query, sources) or career_answer(query, sources) or exact_answer(query, sources)
+    fixed = latest_answer(query, sources) or career_answer(query, sources) or exact_answer(query, sources, original_question=q)
     if fixed:
         body, supported = fixed
         logger.info('rag_grounded_answer supported=%s', supported)

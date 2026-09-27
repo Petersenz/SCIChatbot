@@ -48,7 +48,7 @@ def test_partial_answer_keeps_valid_citations(monkeypatch):
     from backend import rag, generation_cache
     generation_cache.clear()
     # This test exercises partial generated citations, not deterministic overview.
-    monkeypatch.setattr(rag, "exact_answer", lambda *_: None)
+    monkeypatch.setattr(rag, "exact_answer", lambda *_, **kwargs: None)
     client = Mock()
     client.models.generate_content.return_value.text = 'สาขาวิทยาการคอมพิวเตอร์ [1]\nไม่พบข้อมูลหน่วยกิตรวม'
     monkeypatch.setattr(genai, 'Client', Mock(return_value=client))

@@ -1,4 +1,6 @@
 "use client";
+import {AnswerContent} from "@/components/ui/answer-content";
+import {copyAnswerText} from "@/components/ui/answer-format";
 import {TableControls, SortHeading} from "@/components/ui/table-controls";
 import {managementColumns, reportColumns, queryRows, type Filters, type Sort} from "@/components/ui/table-query";
 import { ReviewButton } from "@/components/ui/review-button";
@@ -358,8 +360,7 @@ function CopyAnswer({text, sources}: {text:string; sources:Row[]}) {
   useEffect(()=> { if(state==="idle") return; const timer=setTimeout(()=>setState("idle"),3000);return()=>clearTimeout(timer); },[state]);
   return <><button type="button" className="icon" title="คัดลอกคำตอบ" aria-label={state==="copied"?"คัดลอกแล้ว":"คัดลอกคำตอบ"} onClick={async()=>{
     try {
-      const references=sources.map((source,index)=>`[${index+1}] ${source.title}: ${new URL(sourceHref(source.external_url || source.url || ""),window.location.origin).href}`).join("\n");
-      await navigator.clipboard.writeText(text+(references?"\n\n"+references:""));setState("copied");
+      await navigator.clipboard.writeText(copyAnswerText(text,sources.length));setState("copied");
     } catch {setState("failed");}
   }}>{state==="copied"?<FiCheck />:<FiCopy />}</button>
     <span className={state==="failed"?"copy-error":"rating-sr-only"} role="status">{state==="copied"?"คัดลอกคำตอบแล้วค่ะ":state==="failed"?"คัดลอกไม่ได้ กรุณาเลือกข้อความแล้วคัดลอกด้วยตนเองค่ะ":""}</span></>;
@@ -373,14 +374,9 @@ function AnswerText({ text, sources }: { text: string; sources: Row[] }) {
     const label = source.title || "แหล่งข้อมูล";
     return <a key={index} className="citation-chip" href={href} target="_blank" rel="noopener noreferrer" title={label} aria-label={"เปิดแหล่งข้อมูล: " + label}><FiFileText /><span>{label}</span><FiExternalLink /></a>;
   });
-  return <div className="bot-message">{text.split(/\n\s*\n/).map((paragraph, i) => {
-    const lines = paragraph.split("\n");
-    return <div className="answer-paragraph" key={i}>{lines.map((line, j) => {
-      const bullet = /^\s*[•*]\s+/.test(line);
-      return <div key={j} className={bullet ? "answer-bullet" : "answer-line"}>{render(bullet ? line.replace(/^\s*[•*]\s+/, "") : line)}</div>;
-    })}</div>;
-  })}</div>;
+  return <AnswerContent text={text} renderInline={render} />;
 }
+
 function ConversationActions({busy, title, onAction}: {busy: boolean; title: string; onAction: (action: "rename" | "rate" | "delete") => void}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);

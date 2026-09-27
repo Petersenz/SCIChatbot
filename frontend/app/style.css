@@ -1775,3 +1775,14 @@ dialog:has(.rating-form) { width:min(500px,calc(100vw - 32px)); }
 @media(max-width:600px) { .table-filter-panel {margin:0 12px 12px; padding:14px} .filter-summary {padding:0 12px 12px} .filter-intro {align-items:flex-start} .filter-actions > button {flex:1; padding:8px} .table-controls .table-toolbar {flex-wrap:wrap; gap:12px} }
 @media(pointer:coarse) { .filter-chip, .filter-clear {min-height:44px} }
 @media(prefers-reduced-motion:reduce) { .table-filter-panel {animation:none} .filter-trigger > svg:last-child {transition:none} }
+
+/* Answer structure shared by current answers and stored history. */
+.bot-message .answer-heading {font-size:1em;font-weight:700;line-height:1.65;margin:24px 0 8px;}
+.bot-message .answer-heading:first-child {margin-top:0;}
+.bot-message .answer-paragraph {margin:0 0 16px;white-space:normal;overflow-wrap:anywhere;}
+.bot-message .answer-list {margin:8px 0;padding-inline-start:1.5em;list-style-position:outside;}
+.bot-message ul.answer-list {list-style-type:disc;}
+.bot-message ol.answer-list {list-style-type:decimal;}
+.bot-message .answer-list li {padding-inline-start:4px;margin:8px 0;overflow-wrap:anywhere;}
+.bot-message .answer-list li::marker {color:var(--muted);}
+.bot-message .answer-group-sources {margin:4px 0 18px;}
